@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Deck, Field } from '../lib/types';
 import { getDeck, saveDeck } from '../lib/store';
 import { createSlide, typeList, types } from '../slides';
+import { t as tr, useLang } from '../lib/i18n';
 
 function FieldInput({ f, value, onChange }: { f: Field; value: any; onChange: (v: any) => void }) {
   if (f.kind === 'textarea')
@@ -33,7 +34,8 @@ export function Editor({ id }: { id: string }) {
   useEffect(() => {
     if (deck) saveDeck(deck);
   }, [deck]);
-  if (!deck) return <div class="page">Nicht gefunden. <a href="#/">Zurück</a></div>;
+  useLang();
+  if (!deck) return <div class="page">{tr('editor.notFound')} <a href="#/">{tr('editor.back')}</a></div>;
   const slide = deck.slides[Math.min(sel, deck.slides.length - 1)];
   const t = slide && types[slide.type];
   const update = (fn: (d: Deck) => void) => {
@@ -46,13 +48,14 @@ export function Editor({ id }: { id: string }) {
   return (
     <div class="editor">
       <aside class="slides">
-        <a href="#/">← Start</a>
+        <a href="#/">{tr('editor.back')}</a>
         {deck.slides.map((s, i) => (
-          <div class={'thumb' + (i === sel ? ' on' : '')} onClick={() => setSel(i)}>
+          <button class={'thumb' + (i === sel ? ' on' : '')} aria-current={i === sel} onClick={() => setSel(i)}>
             {i + 1}. {types[s.type].icon} {types[s.type].label}
-          </div>
+          </button>
         ))}
         <select
+          aria-label={tr('editor.add')}
           onChange={(e) => {
             const v = (e.target as HTMLSelectElement).value;
             if (!v) return;
@@ -61,7 +64,7 @@ export function Editor({ id }: { id: string }) {
             (e.target as HTMLSelectElement).value = '';
           }}
         >
-          <option value="">+ Folie hinzufügen …</option>
+          <option value="">{tr('editor.add')}</option>
           {categories.map((c) => (
             <optgroup label={c}>
               {typeList
@@ -86,7 +89,7 @@ export function Editor({ id }: { id: string }) {
 
       <aside class="props">
         <label>
-          Titel der Präsentation
+          {tr('editor.deckTitle')}
           <input value={deck.title} onInput={(e) => update((d) => (d.title = (e.target as HTMLInputElement).value))} />
         </label>
         {slide && t && (
@@ -110,7 +113,7 @@ export function Editor({ id }: { id: string }) {
             </div>
           </>
         )}
-        <a class="btn primary" href={`#/present/${deck.id}`}>▶ Präsentieren</a>
+        <a class="btn primary" href={`#/present/${deck.id}`}>{tr('editor.present')}</a>
         <button
           class="btn"
           onClick={() => {
@@ -120,7 +123,7 @@ export function Editor({ id }: { id: string }) {
             a.click();
           }}
         >
-          Exportieren (JSON)
+          {tr('editor.export')}
         </button>
       </aside>
     </div>

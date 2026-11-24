@@ -3,8 +3,11 @@ import type { Msg, Resp } from '../lib/types';
 import { getDeck, joinCode } from '../lib/store';
 import { openChannel, type Channel } from '../lib/realtime';
 import { types } from '../slides';
+import { createGuard } from '../lib/guard';
+import { t, useLang } from '../lib/i18n';
 
 export function Presenter({ id }: { id: string }) {
+  useLang();
   const deck = useMemo(() => getDeck(id), [id]);
   const code = useMemo(() => joinCode(), []);
   const [index, setIndex] = useState(0);
@@ -19,6 +22,7 @@ export function Presenter({ id }: { id: string }) {
   }, [index]);
   const ch = useRef<Channel | undefined>(undefined);
   const seen = useRef(new Set<string>());
+  const guard = useRef(createGuard());
   const stateRef = useRef({ index, step });
   stateRef.current.index = index;
   stateRef.current.step = step;
@@ -33,14 +37,15 @@ export function Presenter({ id }: { id: string }) {
         setPlayers(seen.current.size);
         send();
       } else if (m.t === 'resp') {
-        seen.current.add(m.resp.pid);
-        setPlayers(seen.current.size);
         const slide = deck.slides.find((s) => s.id === m.slideId);
-        if (!slide) return;
+        const resp = slide && guard.current.accept(m.slideId, m.resp);
+        if (!slide || !resp) return;
+        seen.current.add(resp.pid);
+        setPlayers(seen.current.size);
         const multi = types[slide.type].multi;
         setAll((a) => {
           const cur = a[m.slideId] ?? [];
-          const next = multi ? [...cur, m.resp] : [...cur.filter((r) => r.pid !== m.resp.pid), m.resp];
+          const next = multi ? [...cur, resp] : [...cur.filter((r) => r.pid !== resp.pid), resp];
           return { ...a, [m.slideId]: next };
         });
       }
@@ -80,30 +85,30 @@ export function Presenter({ id }: { id: string }) {
     return () => removeEventListener('keydown', k);
   }, [deck]);
 
-  if (!deck) return <div class="page">Nicht gefunden. <a href="#/">Zurück</a></div>;
+  if (!deck) return <div class="page">{t('editor.notFound')} <a href="#/">{t('editor.back')}</a></div>;
   const slide = deck.slides[index];
-  const t = types[slide.type];
+  const type = types[slide.type];
   const joinUrl = `${location.origin}${location.pathname}#/join/${code}`;
 
   return (
     <div class="present">
-      <div class="stage">
-        <t.Stage
+      <div class="stage" role="main">
+        <type.Stage
           data={slide.data}
           ctx={{ responses: all[slide.id] ?? [], all, deck, joinUrl, code, reveal, step, next: () => setStep((s) => s + 1) }}
         />
       </div>
       <footer class="bar">
-        <a href={`#/edit/${deck.id}`}>✕</a>
-        <button onClick={() => setIndex(Math.max(0, index - 1))}>◀</button>
-        <span>{index + 1} / {deck.slides.length}</span>
-        <button onClick={() => setIndex(Math.min(deck.slides.length - 1, index + 1))}>▶</button>
-        <button onClick={() => setReveal((v) => !v)} title="Lösung zeigen (R)">{reveal ? '🙈 Verbergen' : '👁 Auflösen'}</button>
-        {t.steps && <button onClick={() => setStep((s) => s + 1)} title="Nächster Schritt (N)">⏭ Schritt {step + 1}</button>}
+        <a href={`#/edit/${deck.id}`} aria-label={t('a11y.close')}>✕</a>
+        <button aria-label={t('a11y.prev')} onClick={() => setIndex(Math.max(0, index - 1))}>◀</button>
+        <span aria-live="polite">{index + 1} / {deck.slides.length}</span>
+        <button aria-label={t('a11y.next')} onClick={() => setIndex(Math.min(deck.slides.length - 1, index + 1))}>▶</button>
+        <button onClick={() => setReveal((v) => !v)} title="R">{reveal ? t('present.hide') : t('present.reveal')}</button>
+        {type.steps && <button onClick={() => setStep((s) => s + 1)} title="N">{t('present.step')} {step + 1}</button>}
         <span class="grow" />
-        <span>👥 {players}</span>
-        <span>Code <b class="code">{code}</b></span>
-        <button onClick={() => document.documentElement.requestFullscreen?.()}>⛶</button>
+        <span title="Teilnehmer">👥 {players}</span>
+        <span>{t('present.code')} <b class="code">{code}</b></span>
+        <button aria-label={t('a11y.fullscreen')} onClick={() => document.documentElement.requestFullscreen?.()}>⛶</button>
       </footer>
     </div>
   );

@@ -133,3 +133,25 @@ img.preview { max-width:100%; max-height:200px; border-radius:8px; display:block
 .mn { position:absolute; transform:translate(-50%,-50%); padding:.3em .8em; border-radius:999px; background:#7c5cff; color:#fff; font-size:.9em; white-space:nowrap; }
 .mn.root { font-size:1.4em; font-weight:700; background:#ff5c7c; }
 figure.head span { font-size:3em; display:block; text-align:center; }
+/* Phase 7: Barrierefreiheit und Mobile */
+:focus-visible { outline:3px solid #ffd54a; outline-offset:2px; }
+button.thumb { border:0; color:var(--fg); text-align:left; font:inherit; cursor:pointer; width:100%; }
+.langsel { width:auto; }
+.hint { color:#b3b8dc; }
+@media (max-width: 900px) {
+  .editor { grid-template-columns:1fr; grid-template-rows:auto auto auto; height:auto; min-height:100vh; }
+  .editor aside { max-height:none; flex-direction:row; flex-wrap:wrap; align-items:center; }
+  .editor .props { flex-direction:column; align-items:stretch; }
+  .thumb { width:auto !important; }
+  .stage.small { font-size:2vw; }
+  .bar { flex-wrap:wrap; }
+}
+@media (max-width: 520px) {
+  .page { padding:14px; }
+  .row-item { flex-wrap:wrap; }
+  .step { font-size:1em; }
+  .steps { flex-direction:column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+}
