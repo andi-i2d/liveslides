@@ -49,7 +49,7 @@ export function Presenter({ id }: { id: string }) {
   useEffect(() => {
     if (!deck) return;
     const s = deck.slides[index];
-    if (!types[s.type].Player) return;
+    if (!types[s.type].live) return;
     const t = setTimeout(
       () => ch.current?.send({ t: 'live', slideId: s.id, responses: (all[s.id] ?? []).slice(-300) }),
       300,

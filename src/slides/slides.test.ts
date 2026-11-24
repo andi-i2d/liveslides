@@ -64,6 +64,30 @@ describe('Phase 4 Bewertung', () => {
   });
 });
 
+import { haversineKm, scoreMap, scorePin, xyToLatLon } from './grading';
+import { parseHotspots } from './media';
+
+describe('Phase 5 Bild/Karte', () => {
+  it('Pin: Treffer = volle Punkte, ausserhalb = 0', () => {
+    const d = { x: 50, y: 50, radius: 20, points: 1000 };
+    expect(scorePin(d, [0.5, 0.5])).toBe(1000);
+    expect(scorePin(d, [0.6, 0.5])).toBe(500);
+    expect(scorePin(d, [0.9, 0.9])).toBe(0);
+    expect(scorePin(d, 'x')).toBe(0);
+  });
+  it('Karte: Koordinaten und Entfernung', () => {
+    expect(xyToLatLon(0.5, 0.5)).toEqual({ lat: 0, lon: 0 });
+    expect(Math.round(haversineKm({ lat: 0, lon: 0 }, { lat: 0, lon: 90 }))).toBe(10008);
+    const d = { lat: 0, lon: 0, maxKm: 1000, points: 100 };
+    expect(scoreMap(d, [0.5, 0.5])).toBe(100);
+    expect(scoreMap(d, [0.9, 0.5])).toBe(0);
+  });
+  it('Hotspots werden geparst (max. 8, ungueltige ignoriert)', () => {
+    expect(parseHotspots(['10; 20; Hallo; Welt', 'kaputt', 'a; b; c'])).toEqual([{ x: 0.1, y: 0.2, text: 'Hallo; Welt' }]);
+    expect(parseHotspots(Array(12).fill('1; 1; x'))).toHaveLength(8);
+  });
+});
+
 describe('Phase 3 Auswertung', () => {
   const r = (pid: string, data: any, at = 0) => ({ pid, name: pid, data, at });
   it('Ranking: Borda-Punkte', () => {

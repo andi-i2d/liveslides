@@ -25,6 +25,6 @@ Eintrag vom Typ `SlideType` (`src/lib/types.ts`) anlegen und in `src/slides/inde
 (`defaults`, `fields`, `Stage` fürs Beamerbild, optional `Player` fürs Handy und `score`).
 
 ## Stand
-Phase 1-4 fertig (38 Folientypen): Inhalt, Diagramme, Charts, Q&A, 14 Umfragetypen sowie 11 Quiztypen (Auswahl, Kurzantwort, Wahr/Falsch, Zahl schaetzen, Reihenfolge, Kategorien, Paare, Luckentext, fehlende Buchstaben, Kreuzwortraetsel, YouTube) mit Rangliste.
+Phase 1-5 fertig (46 Folientypen): Inhalt, Diagramme, Charts, Q&A, 14 Umfragetypen, 11 Quiztypen sowie Bild/Karte/Zeichnen (Pin auf Bild, Pin-Quiz, Karten-Quiz, Interaktives Bild, Auf Bild zeichnen, Antwort zeichnen, Foto teilen, Bild erraten).
 Quiz-Loesungen erscheinen erst nach Klick auf 'Aufloesen' (Taste R).
-Offen: Phase 5 (Bild/Karte/Zeichnen), 6 (Spiele), 7 (Politur).
+Offen: Phase 6 (Spiele), 7 (Politur).

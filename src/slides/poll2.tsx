@@ -369,6 +369,7 @@ export const brainstorm: SlideType = {
   category: 'Umfrage',
   interactive: true,
   multi: true,
+  live: true,
   defaults: () => ({ question: 'Eure Ideen?', ideas: 2, votes: 3 }),
   fields: [
     { key: 'question', label: 'Frage', kind: 'text' },

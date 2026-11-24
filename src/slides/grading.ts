@@ -81,6 +81,27 @@ export function maskWord(w: string) {
   return [...w].map((c) => (c === ' ' ? c : k++ % 2 === 1 ? '_' : c)).join('');
 }
 
+/** Pin auf Bild: Ziel (x,y in %) und Radius (in % der Bildbreite). Treffer in der Mitte = volle Punkte. */
+export function scorePin(d: { x: number; y: number; radius: number; points: number }, p: unknown) {
+  if (!Array.isArray(p)) return 0;
+  const dist = Math.hypot(Number(p[0]) - d.x / 100, Number(p[1]) - d.y / 100);
+  return Math.round(Number(d.points) * Math.max(0, 1 - dist / (Math.max(1, d.radius) / 100)));
+}
+
+/** Kartenpunkt (Equirectangular, ganze Welt) → Lat/Lon. */
+export const xyToLatLon = (x: number, y: number) => ({ lat: 90 - y * 180, lon: x * 360 - 180 });
+export function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
+  const r = (v: number) => (v * Math.PI) / 180;
+  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lon - a.lon) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+/** Je näher (km), desto mehr Punkte; ab maxKm 0. */
+export function scoreMap(d: { lat: number; lon: number; maxKm: number; points: number }, p: unknown) {
+  if (!Array.isArray(p)) return 0;
+  const km = haversineKm(xyToLatLon(Number(p[0]), Number(p[1])), { lat: d.lat, lon: d.lon });
+  return Math.round(Number(d.points) * Math.max(0, 1 - km / Math.max(1, Number(d.maxKm))));
+}
+
 /** Zeilen "Hinweis; Lösung" (Kreuzworträtsel): Teilpunkte je richtigem Wort. */
 export function scoreClues(d: { clues: string[]; points: number }, answers: unknown) {
   if (!Array.isArray(answers)) return 0;

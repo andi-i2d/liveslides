@@ -10,6 +10,7 @@ export const qa: SlideType = {
   category: 'Umfrage',
   interactive: true,
   multi: true,
+  live: true,
   defaults: () => ({ title: 'Eure Fragen' }),
   fields: [{ key: 'title', label: 'Titel', kind: 'text' }],
   Stage: ({ data, ctx }) => {

@@ -93,3 +93,20 @@ input[type=range] { padding:0; }
 .blank { border-bottom:.15em solid var(--acc); margin:0 .2em; letter-spacing:.1em; }
 .mono { font-family:ui-monospace,Consolas,monospace; letter-spacing:.2em; }
 input.inline { display:inline-block; width:8em; margin:0 .3em; }
+/* Phase 5 */
+.pinimg { position:relative; display:inline-block; max-width:100%; max-height:70%; line-height:0; user-select:none; touch-action:manipulation; }
+.pinimg img { max-width:100%; max-height:60vh; border-radius:10px; display:block; }
+.pinimg.small img { max-height:50vh; }
+.pinimg .ph { padding:3em; background:#0f1226; border-radius:10px; line-height:1.4; color:var(--muted); }
+.pin { position:absolute; transform:translate(-50%,-50%); width:1.4em; height:1.4em; border-radius:50%; border:2px solid #fff; display:flex; align-items:center; justify-content:center; font-size:.8em; line-height:1; color:#fff; padding:0; }
+.pin.ring { width:3em; height:3em; border:.25em solid var(--ok); }
+.pin.tap { width:2.2em; height:2.2em; font-size:1rem; cursor:pointer; }
+.pinimg .over { position:absolute; inset:0; width:100%; height:100%; }
+.over.draw { touch-action:none; cursor:crosshair; }
+.blurred { filter:blur(28px); transform:scale(1.05); }
+canvas.pad { width:100%; max-width:320px; border-radius:10px; touch-action:none; background:#fff; display:block; margin-bottom:8px; }
+.gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(9em,1fr)); gap:.8em; }
+.gallery figure { margin:0; background:#0f1226; padding:.4em; border-radius:10px; }
+.gallery img { width:100%; border-radius:6px; background:#fff; }
+.gallery figcaption { font-size:.8em; color:var(--muted); padding:.2em; }
+img.preview { max-width:100%; max-height:200px; border-radius:8px; display:block; margin:6px 0; }

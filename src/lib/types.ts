@@ -47,6 +47,8 @@ export interface SlideType {
   interactive: boolean;
   /** true: mehrere Antworten pro Person erlaubt */
   multi?: boolean;
+  /** true: Präsentator spiegelt alle Antworten an die Handys (Player bekommt `live`). Nicht für große Antworten! */
+  live?: boolean;
   defaults(): any;
   fields: Field[];
   Stage(p: { data: any; ctx: StageCtx }): ComponentChildren;
