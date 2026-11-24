@@ -33,7 +33,7 @@ export const quiz: SlideType = {
   Stage: ({ data, ctx }) => (
     <div class="col">
       <h2>{data.question}</h2>
-      <Bars options={data.options} counts={tally(data.options.length, ctx.responses)} correct={data.correct - 1} />
+      <Bars options={data.options} counts={tally(data.options.length, ctx.responses)} correct={ctx.reveal ? data.correct - 1 : undefined} />
     </div>
   ),
   Player: ({ data, submit, mine }) => (

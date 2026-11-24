@@ -34,6 +34,8 @@ export interface StageCtx {
   deck: Deck;
   joinUrl: string;
   code: string;
+  /** Präsentator hat „Auflösen“ gedrückt: Quizlösungen dürfen sichtbar werden. */
+  reveal: boolean;
 }
 
 /** Plugin-Schnittstelle: ein Folientyp = ein Eintrag in der Registry. */

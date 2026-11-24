@@ -25,6 +25,45 @@ describe('Diagramm-Daten', () => {
 
 import { avgVectors, ideasWithVotes, rankScores } from './ideas';
 
+import {
+  maskWord, norm, parseBlanks, scoreBlanks, scoreCategorise, scoreClues, scoreMatch, scoreNumber, scoreOrder, scoreShort,
+} from './grading';
+
+describe('Phase 4 Bewertung', () => {
+  it('Kurzantwort ignoriert Gross-/Kleinschreibung und Akzente', () => {
+    const d = { answers: ['Paris', 'Straße'], points: 100 };
+    expect(scoreShort(d, '  PARIS ')).toBe(100);
+    expect(scoreShort(d, 'strasse')).toBe(100);
+    expect(scoreShort(d, 'Rom')).toBe(0);
+    expect(scoreShort(d, '')).toBe(0);
+  });
+  it('Zahl schätzen: nah = mehr Punkte', () => {
+    const d = { answer: 100, points: 1000 };
+    expect(scoreNumber(d, 100)).toBe(1000);
+    expect(scoreNumber(d, 90)).toBe(900);
+    expect(scoreNumber(d, 500)).toBe(0);
+    expect(scoreNumber(d, 'abc')).toBe(0);
+  });
+  it('Reihenfolge: Teilpunkte pro richtiger Position', () => {
+    const d = { items: ['a', 'b', 'c', 'd'], points: 1000 };
+    expect(scoreOrder(d, [0, 1, 2, 3])).toBe(1000);
+    expect(scoreOrder(d, [1, 0, 2, 3])).toBe(500);
+  });
+  it('Kategorien und Paare', () => {
+    expect(scoreCategorise({ rows: ['A; x', 'B; y', 'C; x'], points: 90 }, [0, 1, 1])).toBe(60);
+    expect(scoreMatch({ pairs: ['a; 1', 'b; 2'], points: 100 }, [0, 0])).toBe(50);
+  });
+  it('Lückentext', () => {
+    expect(parseBlanks('Eins *a* zwei *b*.').map((p) => p.text)).toEqual(['Eins ', 'a', ' zwei ', 'b', '.']);
+    expect(scoreBlanks({ text: 'x *Paris* y *Rom*', points: 100 }, ['paris', 'Wien'])).toBe(50);
+  });
+  it('Kreuzworträtsel, Maske, norm', () => {
+    expect(scoreClues({ clues: ['h; Rom', 'g; Bern'], points: 100 }, ['rom', 'bern'])).toBe(100);
+    expect(maskWord('Berlin')).toBe('B_r_i_');
+    expect(norm('  Ä  Ö ')).toBe('a o');
+  });
+});
+
 describe('Phase 3 Auswertung', () => {
   const r = (pid: string, data: any, at = 0) => ({ pid, name: pid, data, at });
   it('Ranking: Borda-Punkte', () => {

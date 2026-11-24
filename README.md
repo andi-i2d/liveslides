@@ -1,4 +1,4 @@
-﻿# LiveSlides
+# LiveSlides
 
 AhaSlides-ähnliche interaktive Präsentationen, statisch auf GitHub Pages gehostet.
 Stack: Vite + TypeScript + Preact. Live-Teilnahme über Supabase Realtime (Broadcast).
@@ -25,5 +25,6 @@ Eintrag vom Typ `SlideType` (`src/lib/types.ts`) anlegen und in `src/slides/inde
 (`defaults`, `fields`, `Stage` fürs Beamerbild, optional `Player` fürs Handy und `score`).
 
 ## Stand
-Phase 1-3 fertig (28 Folientypen): Inhalt, Diagramme, Charts, Q&A, Umfragen (Poll, Emoji, Wahr/Falsch, Wortwolke, Offene Frage, Skala, Ranking, Zuordnung, 2x2-Matrix, Radar, Punkte verteilen, Ideenwand, Brainstorming, Kurzumfrage), Quiz, Rangliste.
-Offen: Phase 4 (weitere Quiztypen), 5 (Bild/Karte/Zeichnen), 6 (Spiele), 7 (Politur).
+Phase 1-4 fertig (38 Folientypen): Inhalt, Diagramme, Charts, Q&A, 14 Umfragetypen sowie 11 Quiztypen (Auswahl, Kurzantwort, Wahr/Falsch, Zahl schaetzen, Reihenfolge, Kategorien, Paare, Luckentext, fehlende Buchstaben, Kreuzwortraetsel, YouTube) mit Rangliste.
+Quiz-Loesungen erscheinen erst nach Klick auf 'Aufloesen' (Taste R).
+Offen: Phase 5 (Bild/Karte/Zeichnen), 6 (Spiele), 7 (Politur).

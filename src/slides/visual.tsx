@@ -10,6 +10,8 @@ export function parsePairs(lines: string[]) {
     .map((p) => ({ label: p[0].trim(), value: Number(p[1].replace(',', '.')) }));
 }
 
+export const ytId = (url: string) => String(url).match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/)?.[1];
+
 export const image: SlideType = {
   id: 'image',
   label: 'Bild (vollflächig)',
@@ -57,11 +59,11 @@ export const video: SlideType = {
   defaults: () => ({ url: '' }),
   fields: [{ key: 'url', label: 'YouTube-Link', kind: 'url' }],
   Stage: ({ data }) => {
-    const m = String(data.url).match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/);
-    return m ? (
+    const id = ytId(data.url);
+    return id ? (
       <iframe
         class="video"
-        src={`https://www.youtube-nocookie.com/embed/${m[1]}`}
+        src={`https://www.youtube-nocookie.com/embed/${id}`}
         allow="autoplay; encrypted-media; fullscreen"
         allowFullScreen
       />

@@ -10,6 +10,8 @@ export function Presenter({ id }: { id: string }) {
   const [index, setIndex] = useState(0);
   const [all, setAll] = useState<Record<string, Resp[]>>({});
   const [players, setPlayers] = useState(0);
+  const [reveal, setReveal] = useState(false);
+  useEffect(() => setReveal(false), [index]);
   const ch = useRef<Channel | undefined>(undefined);
   const seen = useRef(new Set<string>());
   const stateRef = useRef({ index });
@@ -61,6 +63,7 @@ export function Presenter({ id }: { id: string }) {
       if (['ArrowRight', 'PageDown', ' '].includes(e.key)) setIndex((i) => Math.min(deck.slides.length - 1, i + 1));
       if (['ArrowLeft', 'PageUp'].includes(e.key)) setIndex((i) => Math.max(0, i - 1));
       if (e.key === 'f') document.documentElement.requestFullscreen?.();
+      if (e.key === 'r') setReveal((v) => !v);
     };
     addEventListener('keydown', k);
     return () => removeEventListener('keydown', k);
@@ -76,7 +79,7 @@ export function Presenter({ id }: { id: string }) {
       <div class="stage">
         <t.Stage
           data={slide.data}
-          ctx={{ responses: all[slide.id] ?? [], all, deck, joinUrl, code }}
+          ctx={{ responses: all[slide.id] ?? [], all, deck, joinUrl, code, reveal }}
         />
       </div>
       <footer class="bar">
@@ -84,6 +87,7 @@ export function Presenter({ id }: { id: string }) {
         <button onClick={() => setIndex(Math.max(0, index - 1))}>◀</button>
         <span>{index + 1} / {deck.slides.length}</span>
         <button onClick={() => setIndex(Math.min(deck.slides.length - 1, index + 1))}>▶</button>
+        <button onClick={() => setReveal((v) => !v)} title="Lösung zeigen (R)">{reveal ? '🙈 Verbergen' : '👁 Auflösen'}</button>
         <span class="grow" />
         <span>👥 {players}</span>
         <span>Code <b class="code">{code}</b></span>
