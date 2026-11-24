@@ -6,6 +6,8 @@ import { Editor } from './views/Editor';
 import { Presenter } from './views/Presenter';
 import { Join } from './views/Join';
 import { t } from './lib/i18n';
+import { AuthGate } from './views/Login';
+import { restore } from './lib/google';
 
 /** Fängt Darstellungsfehler einzelner Folien ab, damit nicht die ganze App weiß wird. */
 class ErrorBoundary extends Component<{ children: ComponentChildren }, { err?: Error }> {
@@ -36,14 +38,17 @@ function App() {
   const [, view, arg] = hash.split('/');
   return (
     <ErrorBoundary key={hash}>
-      {view === 'edit' ? <Editor key={arg} id={arg} /> :
-       view === 'present' ? <Presenter key={arg} id={arg} /> :
-       view === 'join' ? <Join key={arg} code={arg ?? ''} /> :
-       <Home />}
+      <AuthGate open={view === 'join'}>
+        {view === 'edit' ? <Editor key={arg} id={arg} /> :
+         view === 'present' ? <Presenter key={arg} id={arg} /> :
+         view === 'join' ? <Join key={arg} code={arg ?? ''} /> :
+         <Home />}
+      </AuthGate>
     </ErrorBoundary>
   );
 }
 
+restore(); // erinnertes Google-Konto still wieder anmelden (nur wenn Anmeldung konfiguriert ist)
 render(<App />, document.getElementById('app')!);
 
 // Offline-Fähigkeit: Editor und Präsentation laden auch ohne Netz aus dem Cache.

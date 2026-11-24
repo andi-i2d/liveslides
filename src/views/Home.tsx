@@ -3,6 +3,9 @@ import { deleteDeck, loadDecks, newDeck, saveDeck, uid } from '../lib/store';
 import { hasBackend } from '../lib/realtime';
 import { setLang, t, useLang } from '../lib/i18n';
 import { types } from '../slides';
+import { useAuth } from '../lib/google';
+import { cloudListDecks, cloudLoadDeck } from '../lib/cloud';
+import type { DriveFile } from '../lib/drive';
 
 /** Import: nur Decks akzeptieren, deren Folientypen wir kennen. */
 export function validDeck(d: any): boolean {
@@ -12,8 +15,52 @@ export function validDeck(d: any): boolean {
   );
 }
 
+function DriveImport({ onImported }: { onImported: () => void }) {
+  const [files, setFiles] = useState<DriveFile[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const open = async () => {
+    setBusy(true);
+    setErr('');
+    try {
+      setFiles(await cloudListDecks());
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    }
+    setBusy(false);
+  };
+  const imp = async (f: DriveFile) => {
+    try {
+      const d = await cloudLoadDeck(f.id);
+      if (!validDeck(d)) throw new Error(t('home.badFile'));
+      d.id = uid();
+      d.slides.forEach((s) => (s.id = uid()));
+      saveDeck(d);
+      onImported();
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    }
+  };
+  return (
+    <section>
+      <button class="btn" disabled={busy} onClick={open}>{busy ? t('cloud.loading') : t('cloud.load')}</button>
+      {err && <p class="warn" role="alert">{err}</p>}
+      {files && files.length === 0 && <p class="hint">{t('cloud.empty')}</p>}
+      {files?.map((f) => (
+        <div class="row-item">
+          <span>{f.name.replace(/\.json$/, '')}</span>
+          <small class="hint">{new Date(f.modifiedTime).toLocaleString()}</small>
+          <span class="grow" />
+          <button class="btn" onClick={() => imp(f)}>{t('cloud.import')}</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export function Home() {
   const lang = useLang();
+  const auth = useAuth();
   const [decks, setDecks] = useState(loadDecks());
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
@@ -38,6 +85,13 @@ export function Home() {
     <div class="page">
       <div class="row">
         <h1 class="grow">LiveSlides</h1>
+        {auth.user && (
+          <span class="userchip">
+            {auth.user.picture && <img src={auth.user.picture} alt="" referrerpolicy="no-referrer" />}
+            <span>{auth.user.email}</span>
+            <button class="btn" onClick={() => auth.signOut()}>{t('auth.signout')}</button>
+          </span>
+        )}
         <select
           class="langsel"
           aria-label={t('a11y.lang')}
@@ -98,6 +152,7 @@ export function Home() {
           <input type="file" accept="application/json" hidden onChange={importDeck} />
         </label>
       </section>
+      {auth.user && <DriveImport onImported={() => setDecks(loadDecks())} />}
     </div>
   );
 }

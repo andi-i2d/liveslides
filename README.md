@@ -9,10 +9,10 @@ Live-Teilnahme per Handy über Supabase Realtime (Broadcast), 63 Folientypen.
 npm install
 npm run dev      # http://localhost:5173
 npm test         # Unit-Tests (Vitest)
-npm run e2e      # End-to-End (Playwright; lokal mit installiertem Edge)
+npm run e2e      # End-to-End (Playwright; lokal mit installiertem Edge; Google/Drive werden simuliert)
 npm run build
 ```
-Ohne Supabase läuft ein Testmodus (BroadcastChannel): Präsentator-Tab und Teilnehmer-Tab im **selben Browser**.
+Ohne Supabase läuft ein Testmodus (BroadcastChannel): Präsentator-Tab und Teilnehmer-Tab im **selben Browser**. **Taste Q** blendet jederzeit einen großen QR-Code zum Beitreten ein.
 
 ## Supabase einrichten (für echte Handys)
 1. Kostenloses Projekt auf supabase.com anlegen. Keine Tabellen nötig – es wird nur *Realtime Broadcast* genutzt.
@@ -29,6 +29,33 @@ Ohne Supabase läuft ein Testmodus (BroadcastChannel): Präsentator-Tab und Teil
 - Offline: Nach dem ersten Laden funktionieren Editor und Präsentation ohne Netz (Service Worker);
   Live-Teilnahme braucht Verbindung.
 
+## Google-Anmeldung und Drive (optional)
+Ist `VITE_GOOGLE_CLIENT_ID` gesetzt, müssen sich Organisatoren (Startseite, Editor, Präsentator) mit Google anmelden.
+Teilnehmer (`#/join/…`) brauchen **keine** Anmeldung. Angemeldete Nutzer bekommen:
+- **Decks in Drive:** Änderungen im Editor werden automatisch als `LiveSlides/Präsentationen/<Titel>.json` gesichert;
+  auf der Startseite lassen sie sich aus Drive wieder laden.
+- **Ergebnisse in Drive:** Während der Präsentation (5 s nach der letzten Antwort, bei Folienwechsel, beim Verlassen und
+  per ☁-Knopf) entsteht `LiveSlides/Ergebnisse/<Datum> <Titel> – Ergebnisse (<Code>).json` mit allen Antworten je Folie,
+  Namen, Zeitstempeln und der Rangliste.
+- Optional `VITE_ALLOWED_DOMAIN` (z. B. `i2d.de`): Konten anderer Domains werden abgelehnt.
+- Optional `VITE_DRIVE_FOLDER_ID`: fester Zielordner (z. B. im geteilten Laufwerk). Dafür wird der volle Drive-Zugriff
+  angefordert; ohne diese Variable genügt `drive.file` (die App sieht nur Dateien, die sie selbst angelegt hat).
+
+**Einrichtung in der Google Cloud Console** (am besten mit einem Konto der Organisation):
+1. Projekt anlegen und unter *APIs & Dienste → Bibliothek* die **Google Drive API** aktivieren.
+2. *Google Auth Platform / OAuth-Zustimmungsbildschirm*: Nutzertyp **Intern** (nur Workspace-Konten der Organisation, keine
+   Verifizierung nötig). Bereiche: `openid`, `email`, `profile`, `…/auth/drive.file` (mit Ordner-ID stattdessen `…/auth/drive`).
+3. *Clients → OAuth-Client erstellen* → Typ **Webanwendung**. Autorisierte JavaScript-Quellen:
+   `https://andi-i2d.github.io` und `http://localhost:5173`. Weiterleitungs-URIs sind nicht nötig. Die **Client-ID** kopieren
+   (es gibt kein Secret, das in die App gehört).
+4. Client-ID (und Domain) als GitHub-Variablen bzw. in `.env.local` eintragen (siehe `.env.example`), dann neu deployen.
+
+**Wichtig zu wissen**
+- Die Anmeldung steuert, wer Drive anbinden kann, ist aber bei einer statischen Seite **keine Zugriffssperre im Sicherheitssinn**:
+  Die App-Dateien sind öffentlich, und Decks liegen ohnehin lokal im Browser.
+- Zugriffstokens laufen nach ca. 1 Stunde ab und werden still erneuert. Blockiert der Browser Drittanbieter-Cookies, kann dafür
+  eine erneute Anmeldung nötig sein; das ☁-Symbol zeigt dann einen Fehler.
+- Die Ergebnisdateien enthalten die Namen der Teilnehmer. Datenschutz (Information der Teilnehmer, Aufbewahrung) liegt bei euch.
 ## Folientypen (63)
 - **Inhalt:** Titel, Inhalt (Bild links/rechts), Liste, Zitat, Bild, YouTube, Diagramm (Schritte, Zeitleiste, Zyklus, Hierarchie), Vergleich, SWOT, Chart (Säulen, Linie, Kreis, Ring), QR-Code
 - **Umfrage:** Umfrage, Emoji, Wahr/Falsch, Wortwolke, Offene Frage, Skala, Ranking, Zuordnung, 2×2-Matrix, Radar, Punkte verteilen, Ideenwand, Brainstorming, Kurzumfrage, Q&A

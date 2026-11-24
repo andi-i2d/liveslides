@@ -155,3 +155,13 @@ button.thumb { border:0; color:var(--fg); text-align:left; font:inherit; cursor:
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
 }
+/* QR-Overlay, Login, Cloud */
+.qroverlay { position:fixed; inset:0 0 2.6rem 0; z-index:20; background:#0b0e22f2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.6em; cursor:pointer; text-align:center; }
+.qroverlay .qr { width:min(55vh,70vw); }
+.huge-code { font-size:3rem; margin:0; }
+.bar button.on { background:var(--acc); border-radius:6px; }
+.login { text-align:center; }
+.login .btn.big { margin:1em 0; }
+.userchip { display:inline-flex; align-items:center; gap:8px; font-size:.9rem; }
+.userchip img { width:28px; height:28px; border-radius:50%; }
+.cloudline { font-size:.85rem; color:var(--muted); display:flex; flex-direction:column; gap:6px; }

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Deck, Field } from '../lib/types';
 import { getDeck, saveDeck } from '../lib/store';
 import { createSlide, typeList, types } from '../slides';
 import { t as tr, useLang } from '../lib/i18n';
+import { cloudReady, cloudSaveDeck, useCloudStatus } from '../lib/cloud';
 
 function FieldInput({ f, value, onChange }: { f: Field; value: any; onChange: (v: any) => void }) {
   if (f.kind === 'textarea')
@@ -35,6 +36,15 @@ export function Editor({ id }: { id: string }) {
     if (deck) saveDeck(deck);
   }, [deck]);
   useLang();
+  const cloud = useCloudStatus();
+  // Änderungen nach kurzer Pause in Google Drive sichern (nicht beim bloßen Öffnen)
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    if (!deck || !cloudReady()) return;
+    const timer = setTimeout(() => cloudSaveDeck(deck), 2000);
+    return () => clearTimeout(timer);
+  }, [deck]);
   if (!deck) return <div class="page">{tr('editor.notFound')} <a href="#/">{tr('editor.back')}</a></div>;
   const slide = deck.slides[Math.min(sel, deck.slides.length - 1)];
   const t = slide && types[slide.type];
@@ -112,6 +122,12 @@ export function Editor({ id }: { id: string }) {
               <button class="btn" disabled={deck.slides.length < 2} onClick={() => { update((d) => d.slides.splice(sel, 1)); setSel(Math.max(0, sel - 1)); }}>🗑</button>
             </div>
           </>
+        )}
+        {cloudReady() && (
+          <div class="cloudline" role="status">
+            {cloud.state === 'saving' ? tr('cloud.saving') : cloud.state === 'saved' ? tr('cloud.saved') : cloud.state === 'error' ? `${tr('cloud.error')}: ${cloud.message}` : ''}
+            <button class="btn" onClick={() => cloudSaveDeck(deck)}>{tr('cloud.saveNow')}</button>
+          </div>
         )}
         <a class="btn primary" href={`#/present/${deck.id}`}>{tr('editor.present')}</a>
         <button

@@ -78,6 +78,24 @@ test('Eingabeflut wird begrenzt (Rate-Limit)', async ({ browser }) => {
   await ctx.close();
 });
 
+test('QR-Code lässt sich jederzeit ein- und ausblenden (Taste Q und Knopf)', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { pres, code } = await startPresenter(ctx, [mk('poll', { question: 'Egal?', options: ['A', 'B'] })]);
+  await expect(pres.locator('.qroverlay')).toHaveCount(0);
+  await pres.keyboard.press('q');
+  const overlay = pres.getByRole('dialog', { name: 'QR-Code' });
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator('img.qr')).toBeVisible();
+  await expect(overlay).toContainText(code);
+  await overlay.click(); // Klick schließt
+  await expect(overlay).toHaveCount(0);
+  await pres.getByRole('button', { name: /QR-Code/ }).click(); // Knopf in der Leiste
+  await expect(overlay).toBeVisible();
+  await pres.keyboard.press('Escape');
+  await expect(overlay).toHaveCount(0);
+  await ctx.close();
+});
+
 test('Sprachwechsel auf der Startseite', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => localStorage.setItem('liveslides.lang', 'de'));
