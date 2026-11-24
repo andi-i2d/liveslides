@@ -79,7 +79,7 @@ export function Editor({ id }: { id: string }) {
       <main class="canvas">
         {slide && t && (
           <div class="stage small">
-            <t.Stage data={slide.data} ctx={{ responses: [], all: {}, deck, joinUrl: location.href, code: 'ABCDE', reveal: true }} />
+            <t.Stage data={slide.data} ctx={{ responses: [], all: {}, deck, joinUrl: location.href, code: 'ABCDE', reveal: true, step: 0, next: () => {} }} />
           </div>
         )}
       </main>

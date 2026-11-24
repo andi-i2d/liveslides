@@ -36,6 +36,9 @@ export interface StageCtx {
   code: string;
   /** Präsentator hat „Auflösen“ gedrückt: Quizlösungen dürfen sichtbar werden. */
   reveal: boolean;
+  /** Etappe (vom Präsentator weitergeschaltet, Taste N) */
+  step: number;
+  next: () => void;
 }
 
 /** Plugin-Schnittstelle: ein Folientyp = ein Eintrag in der Registry. */
@@ -49,6 +52,8 @@ export interface SlideType {
   multi?: boolean;
   /** true: Präsentator spiegelt alle Antworten an die Handys (Player bekommt `live`). Nicht für große Antworten! */
   live?: boolean;
+  /** true: Folie hat Etappen; Präsentator bekommt einen „Schritt“-Knopf */
+  steps?: boolean;
   defaults(): any;
   fields: Field[];
   Stage(p: { data: any; ctx: StageCtx }): ComponentChildren;
@@ -59,6 +64,7 @@ export interface SlideType {
     /** alle Antworten dieser Folie (vom Präsentator gesendet) */
     live: Resp[];
     pid: string;
+    step: number;
   }): ComponentChildren;
   /** Punkte pro Antwort (Quiz) */
   score?(data: any, r: Resp): number;
@@ -67,6 +73,6 @@ export interface SlideType {
 // ---- Netzwerkprotokoll ----
 export type Msg =
   | { t: 'hello'; pid: string }
-  | { t: 'state'; deck: Deck; index: number; code: string }
+  | { t: 'state'; deck: Deck; index: number; step?: number; code: string }
   | { t: 'resp'; slideId: string; resp: Resp }
   | { t: 'live'; slideId: string; responses: Resp[] };

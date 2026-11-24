@@ -88,6 +88,55 @@ describe('Phase 5 Bild/Karte', () => {
   });
 });
 
+import { BIG5_ITEMS, bracket, chestValue, makeGroups, makePairs, parseNode, personalityScores, SEP } from './gamelogic';
+import { parseMcq } from './games';
+
+describe('Phase 6 Spiele', () => {
+  const v = (pid: string, d: number, vote: 0 | 1) => ({ pid, name: pid, data: { d, v: vote }, at: 0 });
+  it('Gruppen: alle verteilt, Groessen max. 1 Unterschied', () => {
+    const g = makeGroups(['a', 'b', 'c', 'd', 'e'], 2);
+    expect(g.flat().sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(Math.abs(g[0].length - g[1].length)).toBeLessThanOrEqual(1);
+    expect(makeGroups(['a'], 5)).toHaveLength(1);
+  });
+  it('Paare: ungerade Zahl ergibt ein Dreier-Team', () => {
+    const p = makePairs(['a', 'b', 'c', 'd', 'e']);
+    expect(p.flat()).toHaveLength(5);
+    expect(p.map((x) => x.length).sort()).toEqual([2, 3]);
+  });
+  it('Turnier: Sieger ruecken auf, Gleichstand gewinnt A', () => {
+    let b = bracket(['A', 'B', 'C', 'D'], [v('p1', 0, 1), v('p2', 0, 1), v('p1', 1, 0)]);
+    expect(b.duels).toHaveLength(3);
+    expect(b.duels[0].winner).toBe('B');
+    expect(b.duels[1].winner).toBe('C');
+    expect(b.duels[2]).toMatchObject({ a: 'B', b: 'C', winner: null });
+    b = bracket(['A', 'B', 'C', 'D'], [v('p1', 0, 1), v('p1', 1, 0), v('p1', 2, 1), v('p2', 2, 1)]);
+    expect(b.champion).toBe('C');
+    expect(bracket(['A', 'B', 'C'], []).size).toBe(2);
+  });
+  it('Turnier: pro Person nur eine Stimme je Duell (letzte zaehlt)', () => {
+    const b = bracket(['A', 'B'], [v('p1', 0, 0), v('p1', 0, 1)]);
+    expect(b.duels[0]).toMatchObject({ ca: 0, cb: 1, winner: 'B' });
+  });
+  it('Truhen sind deterministisch', () => {
+    expect(chestValue('p', 1)).toBe(chestValue('p', 1));
+  });
+  it('MCQ-Zeilen parsen', () => {
+    expect(parseMcq('Frage? | A | B | C | 2')).toEqual({ q: 'Frage?', opts: ['A', 'B', 'C'], correct: 1 });
+    expect(parseMcq('Frage? | A | B')).toEqual({ q: 'Frage?', opts: ['A', 'B'], correct: 0 });
+  });
+  it('Persoenlichkeit: umgekehrte Items werden gespiegelt', () => {
+    const allFive = BIG5_ITEMS.map(() => 5);
+    const s = personalityScores(allFive);
+    expect(s).toEqual([3, 3, 3, 3, 3]); // 5 und (6-5)=1 → Mittel 3
+    expect(personalityScores(BIG5_ITEMS.map((i) => (i.reverse ? 1 : 5)))).toEqual([5, 5, 5, 5, 5]);
+  });
+  it('Mindmap-Knoten', () => {
+    expect(parseNode(`root${SEP}Idee`)).toEqual({ parent: 'root', text: 'Idee' });
+    expect(parseNode('ohne')).toEqual({ parent: 'root', text: 'ohne' });
+  });
+});
+
 describe('Phase 3 Auswertung', () => {
   const r = (pid: string, data: any, at = 0) => ({ pid, name: pid, data, at });
   it('Ranking: Borda-Punkte', () => {

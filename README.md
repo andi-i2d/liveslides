@@ -25,6 +25,6 @@ Eintrag vom Typ `SlideType` (`src/lib/types.ts`) anlegen und in `src/slides/inde
 (`defaults`, `fields`, `Stage` fürs Beamerbild, optional `Player` fürs Handy und `score`).
 
 ## Stand
-Phase 1-5 fertig (46 Folientypen): Inhalt, Diagramme, Charts, Q&A, 14 Umfragetypen, 11 Quiztypen sowie Bild/Karte/Zeichnen (Pin auf Bild, Pin-Quiz, Karten-Quiz, Interaktives Bild, Auf Bild zeichnen, Antwort zeichnen, Foto teilen, Bild erraten).
-Quiz-Loesungen erscheinen erst nach Klick auf 'Aufloesen' (Taste R).
-Offen: Phase 6 (Spiele), 7 (Politur).
+Phase 1-6 fertig (65 Folientypen). Neu in Phase 6: Gluecksrad, Timer, Atempause, Gruppen/Paare, Entenrennen, Halloween-Rennen, Pick-a-Boo, Bubble Rush, Schatzsuche, Turnier, Team-Retro, Mindmap, Persoenlichkeitstest, Rueckblick, Escape Room, Kopf-Tausch.
+Folien mit Etappen (Turnier, Retro) schaltest du mit Taste N bzw. dem Knopf 'Schritt' weiter.
+Offen: Phase 7 (Politur).

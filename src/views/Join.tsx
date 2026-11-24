@@ -9,6 +9,7 @@ export function Join({ code }: { code: string }) {
   const [joined, setJoined] = useState(false);
   const [deck, setDeck] = useState<Deck>();
   const [index, setIndex] = useState(0);
+  const [step, setStep] = useState(0);
   const [mine, setMine] = useState<Record<string, Resp[]>>({});
   const [live, setLive] = useState<Record<string, Resp[]>>({});
   const ch = useRef<Channel | undefined>(undefined);
@@ -21,6 +22,7 @@ export function Join({ code }: { code: string }) {
       if (m.t === 'state') {
         setDeck(m.deck);
         setIndex(m.index);
+        setStep(m.step ?? 0);
       } else if (m.t === 'live') {
         setLive((l) => ({ ...l, [m.slideId]: m.responses }));
       }
@@ -63,7 +65,7 @@ export function Join({ code }: { code: string }) {
   return (
     <div class="page narrow">
       {t.Player ? (
-        <t.Player data={slide.data} submit={submit} mine={mine[slide.id] ?? []} live={live[slide.id] ?? []} pid={pid.current} />
+        <t.Player data={slide.data} submit={submit} mine={mine[slide.id] ?? []} live={live[slide.id] ?? []} pid={pid.current} step={step} />
       ) : (
         <p class="hint">Schau auf den großen Bildschirm 👀</p>
       )}

@@ -11,15 +11,22 @@ export function Presenter({ id }: { id: string }) {
   const [all, setAll] = useState<Record<string, Resp[]>>({});
   const [players, setPlayers] = useState(0);
   const [reveal, setReveal] = useState(false);
-  useEffect(() => setReveal(false), [index]);
+  /** Etappe innerhalb einer Folie (Turnier-Duell, Retro-Phase …); wird an die Handys gesendet. */
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    setReveal(false);
+    setStep(0);
+  }, [index]);
   const ch = useRef<Channel | undefined>(undefined);
   const seen = useRef(new Set<string>());
-  const stateRef = useRef({ index });
+  const stateRef = useRef({ index, step });
   stateRef.current.index = index;
+  stateRef.current.step = step;
 
   useEffect(() => {
     if (!deck) return;
-    const send = () => ch.current?.send({ t: 'state', deck, index: stateRef.current.index, code });
+    const send = () =>
+      ch.current?.send({ t: 'state', deck, index: stateRef.current.index, step: stateRef.current.step, code });
     ch.current = openChannel(code, (m: Msg) => {
       if (m.t === 'hello') {
         seen.current.add(m.pid);
@@ -42,8 +49,8 @@ export function Presenter({ id }: { id: string }) {
   }, [deck, code]);
 
   useEffect(() => {
-    if (deck) ch.current?.send({ t: 'state', deck, index, code });
-  }, [index]);
+    if (deck) ch.current?.send({ t: 'state', deck, index, step, code });
+  }, [index, step]);
 
   // Live-Antworten der aktuellen Folie an die Handys (gedrosselt), z. B. für Abstimmungen über Ideen
   useEffect(() => {
@@ -60,6 +67,10 @@ export function Presenter({ id }: { id: string }) {
   useEffect(() => {
     if (!deck) return;
     const k = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === 'n') setStep((s) => s + 1);
+      if (e.key === 'N') setStep((s) => Math.max(0, s - 1));
       if (['ArrowRight', 'PageDown', ' '].includes(e.key)) setIndex((i) => Math.min(deck.slides.length - 1, i + 1));
       if (['ArrowLeft', 'PageUp'].includes(e.key)) setIndex((i) => Math.max(0, i - 1));
       if (e.key === 'f') document.documentElement.requestFullscreen?.();
@@ -79,7 +90,7 @@ export function Presenter({ id }: { id: string }) {
       <div class="stage">
         <t.Stage
           data={slide.data}
-          ctx={{ responses: all[slide.id] ?? [], all, deck, joinUrl, code, reveal }}
+          ctx={{ responses: all[slide.id] ?? [], all, deck, joinUrl, code, reveal, step, next: () => setStep((s) => s + 1) }}
         />
       </div>
       <footer class="bar">
@@ -88,6 +99,7 @@ export function Presenter({ id }: { id: string }) {
         <span>{index + 1} / {deck.slides.length}</span>
         <button onClick={() => setIndex(Math.min(deck.slides.length - 1, index + 1))}>▶</button>
         <button onClick={() => setReveal((v) => !v)} title="Lösung zeigen (R)">{reveal ? '🙈 Verbergen' : '👁 Auflösen'}</button>
+        {t.steps && <button onClick={() => setStep((s) => s + 1)} title="Nächster Schritt (N)">⏭ Schritt {step + 1}</button>}
         <span class="grow" />
         <span>👥 {players}</span>
         <span>Code <b class="code">{code}</b></span>
