@@ -84,6 +84,35 @@ async function requestToken(prompt: '' | 'none' | 'select_account'): Promise<str
   });
 }
 
+/**
+ * Zusätzlicher Zugriffsbereich nur bei Bedarf (z. B. Google Fotos): eigenes Token pro Bereich. Die normale Anmeldung
+ * und ihr Token bleiben unberührt, niemand muss neu zustimmen, der die Funktion nicht benutzt.
+ * Muss aus einem Klick heraus aufgerufen werden (Google kann ein Einwilligungsfenster öffnen).
+ */
+const scoped = new Map<string, { value: string; exp: number }>();
+export async function getScopedToken(scope: string): Promise<string> {
+  const c = scoped.get(scope);
+  if (c && c.exp - 60_000 > Date.now()) return c.value;
+  if (!authEnabled || state.status !== 'in') throw new Error('Nicht angemeldet');
+  await loadGis();
+  const t = await new Promise<{ value: string; exp: number }>((res, rej) => {
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope,
+      hd: ALLOWED_DOMAIN || undefined,
+      login_hint: store.get(HINT) || undefined,
+      callback: (r: any) => {
+        if (r.error || !r.access_token) return rej(new Error(r.error_description || r.error || 'Zugriff nicht erteilt'));
+        res({ value: r.access_token, exp: Date.now() + (Number(r.expires_in) || 3600) * 1000 });
+      },
+      error_callback: (e: any) => rej(new Error(e?.type === 'popup_closed' ? 'Das Einwilligungsfenster wurde geschlossen.' : e?.type || 'Zugriff abgebrochen')),
+    });
+    client.requestAccessToken({ prompt: '' });
+  });
+  scoped.set(scope, t);
+  return t.value;
+}
+
 async function loadUser(accessToken: string): Promise<User> {
   const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!r.ok) throw new Error('Profil konnte nicht geladen werden');

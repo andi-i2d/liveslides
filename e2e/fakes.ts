@@ -13,7 +13,7 @@ export async function fakeGoogle(ctx: BrowserContext, who: string) {
     r.fulfill({
       contentType: 'text/javascript',
       body: `window.google = { accounts: { oauth2: {
-        initTokenClient: (cfg) => ({ requestAccessToken: () => setTimeout(() => cfg.callback({ access_token: 'tok-' + window.__who, expires_in: 3600 }), 10) }),
+        initTokenClient: (cfg) => ({ requestAccessToken: () => { (window.__scopes = window.__scopes || []).push(cfg.scope); setTimeout(() => cfg.callback({ access_token: 'tok-' + window.__who, expires_in: 3600 }), 10); } }),
         revoke: (t, cb) => cb && cb(),
       } } };`,
     }),
@@ -85,4 +85,27 @@ export async function fakePicker(ctx: BrowserContext, choice: 'pick' | 'cancel' 
       window.gapi = { load(name, opts) { window.google = window.google || {}; window.google.picker = P; (opts.callback || opts)(); } };`,
     }),
   );
+}
+
+/**
+ * Simuliert die Google-Fotos-Picker-API und den Bild-Host. `polls` = Antworten auf GET /sessions/{id} nacheinander,
+ * `imageFails` lässt den Foto-Abruf scheitern (wie bei einer CORS-Sperre).
+ */
+export async function fakePhotos(ctx: BrowserContext, o: { polls?: boolean[]; imageFails?: boolean } = {}) {
+  const calls: { method: string; path: string; body?: string }[] = [];
+  let poll = 0;
+  const polls = o.polls ?? [false, true];
+  await ctx.route('https://photospicker.googleapis.com/**', (r) => {
+    const req = r.request();
+    const path = new URL(req.url()).pathname + new URL(req.url()).search;
+    calls.push({ method: req.method(), path, body: req.postData() ?? undefined });
+    if (req.method() === 'POST') return r.fulfill({ json: { id: 'S1', pickerUri: 'https://photos.google.com/picker/S1', pollingConfig: { pollInterval: '0.3s', timeoutIn: '30s' } } });
+    if (req.method() === 'DELETE') return r.fulfill({ json: {} });
+    if (path.startsWith('/v1/mediaItems')) return r.fulfill({ json: { mediaItems: [{ id: 'm1', type: 'PHOTO', mediaFile: { baseUrl: 'https://lh3.googleusercontent.com/pw/TEST', mimeType: 'image/png', filename: 'a.png' } }] } });
+    return r.fulfill({ json: { id: 'S1', mediaItemsSet: polls[Math.min(poll++, polls.length - 1)] } });
+  });
+  await ctx.route('https://lh3.googleusercontent.com/**', (r) =>
+    o.imageFails ? r.abort('failed') : r.fulfill({ contentType: 'image/png', body: PNG, headers: { 'access-control-allow-origin': '*' } }));
+  await ctx.route('https://photos.google.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<title>Google Fotos (Test)</title>Wähle ein Foto' }));
+  return { calls };
 }

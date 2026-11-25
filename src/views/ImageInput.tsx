@@ -4,6 +4,7 @@ import { blobToDataUrl, dataUrlBytes, isDataUrl } from '../lib/images';
 import { cloudGetBlob, cloudListImages, cloudReady } from '../lib/cloud';
 import type { DriveImage } from '../lib/drive';
 import { pickDriveImage, pickerAvailable } from '../lib/picker';
+import { PhotosError, pickGooglePhoto, type PhotosStatus } from '../lib/photos';
 
 /** Drive-Dateien über 25 MB werden nicht geladen (zu groß zum Verkleinern im Browser). */
 const MAX_DRIVE_BYTES = 25_000_000;
@@ -55,6 +56,8 @@ export function ImageInput({ value, onChange }: { value: string; onChange: (v: s
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [drive, setDrive] = useState(false);
+  const [photos, setPhotos] = useState<PhotosStatus | null>(null);
+  const abort = useRef<AbortController | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const embedded = isDataUrl(value);
 
@@ -70,6 +73,23 @@ export function ImageInput({ value, onChange }: { value: string; onChange: (v: s
     setBusy(false);
   };
 
+
+  /** Google Fotos: Auswahl im Google-Fotos-Fenster, danach wie jede andere Quelle verkleinern und einbetten. */
+  const startPhotos = async () => {
+    setErr('');
+    const c = new AbortController();
+    abort.current = c;
+    try {
+      const blob = await pickGooglePhoto(c.signal, setPhotos);
+      setPhotos(null);
+      await take(async () => blob);
+    } catch (e: any) {
+      if (!(e instanceof PhotosError && e.code === 'cancelled')) setErr(String(e?.message ?? e));
+    } finally {
+      setPhotos(null);
+      abort.current = null;
+    }
+  };
   return (
     <div class="imginput">
       {embedded ? (
@@ -114,7 +134,26 @@ export function ImageInput({ value, onChange }: { value: string; onChange: (v: s
             {t('image.fromDrive')}
           </button>
         )}
+        {cloudReady() && (
+          <button type="button" class="btn" disabled={busy || !!photos} onClick={startPhotos}>
+            {t('image.fromPhotos')}
+          </button>
+        )}
       </div>
+      {photos && (
+        <div class="photostatus" role="status">
+          <p>{photos.state === 'waiting' ? t('image.photosWaiting') : t('image.processing')}</p>
+          <div class="row wrap">
+            {photos.state === 'waiting' && photos.blocked && (
+              <>
+                <small class="hint">{t('image.photosBlocked')}</small>
+                <button type="button" class="btn primary" onClick={() => window.open(photos.pickerUri, '_blank')}>{t('image.photosOpen')}</button>
+              </>
+            )}
+            <button type="button" class="btn" onClick={() => abort.current?.abort()}>{t('image.cancel')}</button>
+          </div>
+        </div>
+      )}
       {busy && <p class="hint" role="status">{t('image.processing')}</p>}
       {err && <p class="warn" role="alert">{err}</p>}
       {drive && <DrivePicker onClose={() => setDrive(false)} onPick={(img) => take(() => cloudGetBlob(img.id))} />}
