@@ -9,7 +9,7 @@ import {
   bubbleRush, calm, duckRace, escapeRoom, groupMaker, halloweenRace, lookBack, mindmap, pairMaker, personality, pickABoo,
   pumpkin, retro, spinner, timer, tournament, treasureHunt,
 } from './games';
-import { annotate, drawAnswer, guessImage, hotspots, mapQuiz, photoShare, pinImage, pinQuiz } from './media';
+import { annotate, drawAnswer, guessImage, hotspots, mapQuiz, photoDrop, photoShare, pinImage, pinQuiz } from './media';
 import { categorise, correctOrder, crossword, fillBlanks, guessNumber, matchPairs, missingLetters, shortAnswer, trueFalseQuiz, youtubeQuiz } from './quiz2';
 import { brainstorm, emoji, ideaBoard, matching, matrix, radar, ranking, split, survey, trueFalse } from './poll2';
 
@@ -17,7 +17,7 @@ import { brainstorm, emoji, ideaBoard, matching, matrix, radar, ranking, split, 
 const list: SlideType[] = [
   titleSlide, contentSlide, listSlide, quote, image, video, diagram, comparison, swot, chart, qrSlide,
   poll, emoji, trueFalse, wordcloud, openEnded, scale, ranking, matching, matrix, radar, split, ideaBoard, brainstorm, survey, qa,
-  pinImage, hotspots, annotate, drawAnswer, photoShare,
+  pinImage, hotspots, annotate, drawAnswer, photoShare, photoDrop,
   spinner, timer, calm, groupMaker, pairMaker, duckRace, halloweenRace, tournament, retro, mindmap, personality, lookBack, escapeRoom, pumpkin,
   pickABoo, bubbleRush, treasureHunt,
   quiz, pinQuiz, mapQuiz, guessImage, shortAnswer, trueFalseQuiz, guessNumber, correctOrder, categorise, matchPairs, fillBlanks, missingLetters, crossword, youtubeQuiz, leaderboard,

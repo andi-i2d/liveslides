@@ -9,7 +9,8 @@ import { createNameRegistry } from '../lib/names';
 import { createCoalescer, liveDelay } from '../lib/pacing';
 import { phoneAssets, stripImages } from '../lib/assets';
 import { t, useLang } from '../lib/i18n';
-import { cloudReady, cloudSaveResults, useCloudStatus } from '../lib/cloud';
+import { cloudReady, cloudSavePhoto, cloudSaveResults, useCloudStatus } from '../lib/cloud';
+import { dataUrlToBlob, pendingDrops, photoFileName } from '../lib/drops';
 import { hasAnyResponse } from '../lib/results';
 
 export function Presenter({ id }: { id: string }) {
@@ -111,8 +112,29 @@ export function Presenter({ id }: { id: string }) {
   }, [all, index]);
   useEffect(() => () => { if (liveTimer.current) clearTimeout(liveTimer.current); }, []);
 
+  // Foto-Drop: neue Fotos der Teilnehmenden automatisch im Ordner „Fotos“ der Präsentation in Drive ablegen.
+  // Fehlgeschlagene werden beim nächsten Eingang oder per ☁-Knopf erneut versucht (höchstens 3 Versuche je Foto).
+  const dropped = useRef(new Set<string>());
+  const dropTries = useRef(new Map<string, number>());
+  const dropN = useRef(0);
+  const flushDrops = () => {
+    if (!deck || !cloudReady()) return;
+    for (const d of pendingDrops(deck, allRef.current, dropped.current, types)) {
+      if ((dropTries.current.get(d.key) ?? 0) >= 3) continue;
+      dropped.current.add(d.key); // in Arbeit
+      const blob = dataUrlToBlob(d.img);
+      cloudSavePhoto(deck, photoFileName(d.resp.at, d.resp.name, ++dropN.current, blob.type), blob).then((ok) => {
+        if (ok) return;
+        dropped.current.delete(d.key);
+        dropTries.current.set(d.key, (dropTries.current.get(d.key) ?? 0) + 1);
+      });
+    }
+  };
+  useEffect(() => flushDrops(), [all]);
+
   // Ergebnisse in Google Drive sichern: kurz nach der letzten Antwort und beim Folienwechsel.
   const saveNow = () => {
+    flushDrops();
     if (deck && cloudReady() && hasAnyResponse(all))
       cloudSaveResults(deck, all, { sessionId: `${deck.id}-${code}`, code, startedAt, participants: seen.current.size });
   };
@@ -173,6 +195,7 @@ export function Presenter({ id }: { id: string }) {
         <button onClick={() => setReveal((v) => !v)} title="R">{reveal ? t('present.hide') : t('present.reveal')}</button>
         {type.steps && <button onClick={() => setStep((s) => s + 1)} title="N">{t('present.step')} {step + 1}</button>}
         <span class="grow" />
+        {type.driveDrop && !cloudReady() && <span class="warnchip">{t('present.dropWarn')}</span>}
         {cloudReady() && (
           <button onClick={saveNow} title={t('cloud.saveNow')}>
             {cloud.state === 'saving' ? t('cloud.saving') : cloud.state === 'error' ? t('cloud.error') : cloud.state === 'saved' ? t('cloud.saved') : '☁'}

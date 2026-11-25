@@ -20,7 +20,7 @@ export function buildResults(deck: Deck, all: Record<string, Resp[]>, meta: Resu
       id: s.id,
       type: s.type,
       data: redactImages(s.data),
-      responses: (all[s.id] ?? []).map((r) => ({ name: r.name, pid: r.pid, at: new Date(r.at).toISOString(), answer: r.data })),
+      responses: (all[s.id] ?? []).map((r) => ({ name: r.name, pid: r.pid, at: new Date(r.at).toISOString(), answer: redactImages(r.data) })),
     })),
   };
 }

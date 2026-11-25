@@ -72,4 +72,15 @@ describe('Bilder im Deck und auf den Handys', () => {
     expect(JSON.stringify(r)).not.toContain('data:image');
     expect(JSON.stringify(r)).toContain('[eingebettetes Bild]');
   });
-});
+
+  it('Antworten mit Fotos oder Zeichnungen landen ohne Bilddaten in der Ergebnisdatei', () => {
+    const deck = { id: 'd', title: 'T', slides: [{ ...createSlide('photodrop') }, { ...createSlide('drawanswer') }] };
+    const all = {
+      [deck.slides[0].id]: [{ pid: 'p', name: 'Anna', at: 1, data: { img: PNG, cap: 'Gruppenfoto' } }],
+      [deck.slides[1].id]: [{ pid: 'p', name: 'Anna', at: 2, data: PNG }],
+    };
+    const r = buildResults(deck, all, { code: 'ABCDE', startedAt: 0, participants: 1 });
+    expect(JSON.stringify(r)).not.toContain('data:image');
+    expect(r.slides[0].responses[0].answer).toEqual({ img: '[eingebettetes Bild]', cap: 'Gruppenfoto' }); // Unterschrift bleibt
+    expect(r.slides[1].responses[0].answer).toBe('[eingebettetes Bild]');
+  });});

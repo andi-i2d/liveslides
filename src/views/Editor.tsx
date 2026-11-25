@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Deck, Field } from '../lib/types';
 import { getDeck, saveDeck } from '../lib/store';
-import { createSlide, typeList, types } from '../slides';
+import { createSlide, types } from '../slides';
 import { t as tr, useLang } from '../lib/i18n';
 import { cloudReady, cloudSaveDeck, useCloudStatus } from '../lib/cloud';
 import { Logo } from './Brand';
 import { ImageInput } from './ImageInput';
+import { SlidePicker } from './SlidePicker';
+import { PhoneView } from './PhoneView';
 
 function FieldInput({ f, value, onChange }: { f: Field; value: any; onChange: (v: any) => void }) {
   if (f.kind === 'textarea')
@@ -35,6 +37,7 @@ export function Editor({ id }: { id: string }) {
   const [deck, setDeck] = useState<Deck | undefined>(getDeck(id));
   const [sel, setSel] = useState(0);
   const [storageFull, setStorageFull] = useState(false);
+  const [phone, setPhone] = useState(false);
   useEffect(() => {
     if (deck) setStorageFull(!saveDeck(deck)); // false = Browser-Speicher voll (z. B. viele eingebettete Bilder)
   }, [deck]);
@@ -56,7 +59,6 @@ export function Editor({ id }: { id: string }) {
     fn(c);
     setDeck(c);
   };
-  const categories = [...new Set(typeList.map((x) => x.category))];
 
   return (
     <div class="editor">
@@ -64,39 +66,28 @@ export function Editor({ id }: { id: string }) {
         <a class="row" href="#/"><Logo size={26} /> {tr('editor.back')}</a>
         {deck.slides.map((s, i) => (
           <button class={'thumb' + (i === sel ? ' on' : '')} aria-current={i === sel} onClick={() => setSel(i)}>
-            {i + 1}. {types[s.type].icon} {types[s.type].label}
+            {i + 1}. {types[s.type].icon} {types[s.type].label}{types[s.type].interactive && <span class="badge" title={tr('editor.mode.interactive')} aria-label={tr('editor.mode.interactive')}>⚡</span>}
           </button>
         ))}
-        <select
-          aria-label={tr('editor.add')}
-          onChange={(e) => {
-            const v = (e.target as HTMLSelectElement).value;
-            if (!v) return;
+        <SlidePicker
+          onPick={(v) => {
             update((d) => d.slides.push(createSlide(v)));
             setSel(deck.slides.length);
-            (e.target as HTMLSelectElement).value = '';
           }}
-        >
-          <option value="">{tr('editor.add')}</option>
-          {categories.map((c) => (
-            <optgroup label={c}>
-              {typeList
-                .filter((x) => x.category === c)
-                .map((x) => (
-                  <option value={x.id}>
-                    {x.icon} {x.label}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
+        />
       </aside>
 
-      <main class="canvas">
+      <main class={'canvas' + (phone ? ' withphone' : '')}>
         {slide && t && (
           <div class="stage small">
             <t.Stage data={slide.data} ctx={{ responses: [], all: {}, deck, joinUrl: location.href, code: 'ABCDE', reveal: true, step: 0, next: () => {} }} />
           </div>
+        )}
+        {slide && phone && <PhoneView slide={slide} onClose={() => setPhone(false)} />}
+        {slide && (
+          <button class={'btn phonetoggle' + (phone ? ' on' : '')} aria-pressed={phone} onClick={() => setPhone((p) => !p)}>
+            {tr('editor.phone')}
+          </button>
         )}
       </main>
 

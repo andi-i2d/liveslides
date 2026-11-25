@@ -40,15 +40,17 @@ export const cloudReady = () => authEnabled && !!currentUser();
 
 /** Speichervorgänge nacheinander ausführen, damit nie zwei „Neu anlegen“-Aufrufe derselben Datei parallel laufen. */
 let chain: Promise<unknown> = Promise.resolve();
-function enqueue(task: () => Promise<unknown>) {
+function enqueue(task: () => Promise<unknown>): Promise<boolean> {
   const run = chain.then(async () => {
     setStatus({ state: 'saving' });
     try {
       await task();
       setStatus({ state: 'saved', at: Date.now() });
+      return true;
     } catch (e: any) {
       console.warn('Drive:', e);
       setStatus({ state: 'error', message: String(e?.message ?? e) });
+      return false;
     }
   });
   chain = run;
@@ -56,12 +58,12 @@ function enqueue(task: () => Promise<unknown>) {
 }
 
 export function cloudSaveDeck(deck: Deck) {
-  if (!cloudReady()) return Promise.resolve();
+  if (!cloudReady()) return Promise.resolve(false);
   return enqueue(() => drive.saveDeck(env(), ids, deck));
 }
 
 export function cloudSaveResults(deck: Deck, all: Record<string, Resp[]>, meta: ResultsMeta & { sessionId: string }) {
-  if (!cloudReady()) return Promise.resolve();
+  if (!cloudReady()) return Promise.resolve(false);
   const json = buildResults(deck, all, { ...meta, savedAt: Date.now() });
   return enqueue(() => drive.saveResults(env(), ids, { deck: { id: deck.id, title: deck.title }, sessionId: meta.sessionId, name: resultsFileName(meta.code, meta.startedAt), json }));
 }
@@ -70,3 +72,9 @@ export const cloudListDecks = () => drive.listDecks(env());
 export const cloudLoadDeck = (id: string) => drive.getJson<Deck>(env(), id);
 export const cloudListImages = (search?: string) => drive.listImages(env(), search);
 export const cloudGetBlob = (id: string) => drive.getBlob(env(), id);
+
+/** Foto-Drop: Foto eines Teilnehmers im Ordner Fotos der Präsentation ablegen. Liefert true bei Erfolg. */
+export function cloudSavePhoto(deck: Deck, name: string, blob: Blob): Promise<boolean> {
+  if (!cloudReady()) return Promise.resolve(false);
+  return enqueue(() => drive.saveDropFile(env(), ids, { deck: { id: deck.id, title: deck.title }, name, blob }));
+}

@@ -30,4 +30,14 @@ describe('Guard', () => {
     circular.self = circular;
     expect(g.accept('s', r('a', circular))).toBeNull();
   });
+
+  it('lässt Fotos in Nachrichtengröße durch, begrenzt aber die Gesamtmenge je Person und Folie', () => {
+    const photo = 'data:image/jpeg;base64,' + 'A'.repeat(245_000);
+    const g = createGuard({ maxPerSec: 100, maxTotalBytes: 800_000 });
+    const ok = [1, 2, 3, 4].map(() => g.accept('s', r('a', photo), 0)).filter(Boolean);
+    expect(ok).toHaveLength(3); // 3 × ~245 KB passen in 800 KB, das vierte nicht
+    expect(g.accept('s', r('b', photo), 0)).not.toBeNull(); // andere Person: eigenes Kontingent
+    expect(g.accept('s2', r('a', photo), 0)).not.toBeNull(); // andere Folie: eigenes Kontingent
+    expect(createGuard().accept('s', r('a', 'A'.repeat(300_000)), 0)).toBeNull(); // über dem Nachrichtenlimit
+  });
 });

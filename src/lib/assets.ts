@@ -35,6 +35,7 @@ export const withAssets = (slide: Slide, assets?: Record<string, string>) => (as
 
 /** Für Ergebnisdateien: eingebettete Bilder durch einen Hinweis ersetzen (sonst enthält jede Datei dieselben Megabytes). */
 export function redactImages(data: any): any {
+  if (isDataUrl(data)) return '[eingebettetes Bild]'; // z. B. eine gezeichnete Antwort
   if (!data || typeof data !== 'object') return data;
   const out: any = Array.isArray(data) ? [...data] : { ...data };
   for (const k of Object.keys(out)) if (isDataUrl(out[k])) out[k] = '[eingebettetes Bild]';

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'preact/hooks';
 import type { Resp, SlideType } from '../lib/types';
 import { scoreMap, scorePin, scoreShort } from './grading';
-import { PENDING } from '../lib/images';
+import { PENDING, blobToDataUrl } from '../lib/images';
 
 const COLORS = ['#fc6933', '#1e8e8e', '#2f6fb0', '#e8556d', '#4a9d5b', '#146c7a', '#c2541d', '#4f5d75'];
 const WORLD = 'https://upload.wikimedia.org/wikipedia/commons/8/83/Equirectangular_projection_SW.jpg';
@@ -325,6 +325,62 @@ export const photoShare: SlideType = {
   },
 };
 
+/**
+ * Foto-Drop: Teilnehmende senden Fotos (bis ca. 1280 px, max. 180 KB), der Präsentator-Browser legt sie automatisch im
+ * Ordner Fotos der Präsentation in Drive ab (Angemeldet sein ist nötig, sonst werden sie nur gezeigt).
+ */
+export const photoDrop: SlideType = {
+  id: 'photodrop', label: 'Foto-Drop (landet in Drive)', icon: '📥', category: 'Bild', interactive: true, multi: true, driveDrop: true,
+  defaults: () => ({ question: 'Teilt eure Fotos mit uns', max: 5, gallery: 'yes' }),
+  fields: [
+    { key: 'question', label: 'Aufgabe', kind: 'text' },
+    { key: 'max', label: 'Fotos pro Person', kind: 'number' },
+    { key: 'gallery', label: 'Fotos auf dem Beamer zeigen', kind: 'select', options: [{ value: 'yes', label: 'Ja, als Galerie' }, { value: 'no', label: 'Nein, nur Zähler' }] },
+  ],
+  Stage: ({ data, ctx }) => (
+    <div class="col">
+      <h2>{data.question}</h2>
+      <p class="sub">📷 {ctx.responses.length} Foto{ctx.responses.length === 1 ? '' : 's'} erhalten</p>
+      {data.gallery !== 'no' && <Gallery rs={ctx.responses} />}
+    </div>
+  ),
+  Player: ({ data, submit, mine }) => {
+    const [img, setImg] = useState('');
+    const [cap, setCap] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState('');
+    const left = Number(data.max) - mine.length;
+    return (
+      <>
+        <h3>{data.question}</h3>
+        {left > 0 ? (
+          <>
+            <input
+              type="file"
+              accept="image/*"
+              disabled={busy}
+              onChange={async (e) => {
+                const f = (e.target as HTMLInputElement).files?.[0];
+                if (!f) return;
+                setBusy(true); setErr('');
+                try { setImg(await blobToDataUrl(f)); } catch (x: any) { setErr(String(x?.message ?? x)); }
+                setBusy(false);
+              }}
+            />
+            {busy && <p class="hint" role="status">Foto wird verkleinert …</p>}
+            {err && <p class="warn" role="alert">{err}</p>}
+            {img && <img class="preview" src={img} alt="" />}
+            <input placeholder="Bildunterschrift (optional)" maxLength={60} value={cap} onInput={(e) => setCap(inputVal(e))} />
+            <button class="btn primary" disabled={!img || busy} onClick={() => { submit({ img, cap }); setImg(''); setCap(''); }}>Senden</button>
+            <p class="hint">
+              Dein Foto {data.gallery !== 'no' ? 'wird auf dem Beamer gezeigt und ' : ''}wird von den Veranstaltenden gespeichert. Noch {left} Foto{left === 1 ? '' : 's'} möglich.
+            </p>
+          </>
+        ) : <p class="hint">✓ {mine.length} Foto{mine.length === 1 ? '' : 's'} gesendet. Danke!</p>}
+      </>
+    );
+  },
+};
 export const guessImage: SlideType = {
   id: 'guessimage', label: 'Quiz: Bild erraten', icon: '🕵️', category: 'Quiz', interactive: true,
   defaults: () => ({ question: 'Was ist das?', image: '', answers: ['Eiffelturm'], points: 1000 }),

@@ -56,6 +56,8 @@ export interface SlideType {
   steps?: boolean;
   /** true: der Player (Handy) zeigt die Bilder der Folie (kind:'image'); eingebettete Bilder werden dann separat gesendet */
   phoneImages?: boolean;
+  /** true: Bilder in den Antworten (Fotos) werden vom Präsentator-Browser automatisch in Drive abgelegt (Foto-Drop) */
+  driveDrop?: boolean;
   defaults(): any;
   fields: Field[];
   Stage(p: { data: any; ctx: StageCtx }): ComponentChildren;

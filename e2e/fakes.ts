@@ -28,7 +28,10 @@ export async function fakeGoogle(ctx: BrowserContext, who: string) {
     const req = r.request();
     const url = req.url();
     if (url.includes('/upload/')) {
-      uploads.push({ method: req.method(), url, body: req.postData() ?? '' });
+      let body = '';
+      try { body = req.postData() ?? ''; } catch { /* Binärdaten */ }
+      if (!body) body = req.postDataBuffer()?.toString('latin1') ?? ''; // Foto-Uploads sind binär
+      uploads.push({ method: req.method(), url, body });
       return r.fulfill({ json: { id: `file${++n}` } });
     }
     if (req.method() === 'POST') {

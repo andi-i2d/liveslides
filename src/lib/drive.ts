@@ -219,3 +219,47 @@ export async function getBlob(env: DriveEnv, id: string): Promise<Blob> {
   const r = await call(env, `${API}/files/${enc(id)}?alt=media&${SHARED}`);
   return r.blob();
 }
+
+/** Unterordner unter `parent` (nach Namen finden oder anlegen); die ID wird pro Gerät gemerkt, der Schlüssel enthält den Elternordner. */
+export async function subFolder(env: DriveEnv, ids: IdMap, parent: string, name: string): Promise<string> {
+  const key = `sub:${parent}:${name}`;
+  const known = ids.get(key);
+  if (known) return known;
+  const id = await ensureFolder(env, name, parent);
+  ids.set(key, id);
+  return id;
+}
+
+/** Binärdatei (z. B. ein Foto) in einem Ordner anlegen. */
+export async function uploadFile(env: DriveEnv, o: { name: string; folderId: string; blob: Blob; kind?: string }): Promise<string> {
+  const b = 'ls' + Math.random().toString(36).slice(2);
+  const mime = o.blob.type || 'application/octet-stream';
+  const meta = { name: o.name, parents: [o.folderId], mimeType: mime, appProperties: { [APP]: o.kind ?? 'file' } };
+  const head = `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: ${mime}\r\n\r\n`;
+  const r = await call(env, `${UPLOAD}/files?uploadType=multipart&fields=id&${SHARED}`, {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${b}` },
+    body: new Blob([head, o.blob, `\r\n--${b}--`]),
+  });
+  return (await r.json()).id;
+}
+
+export const PHOTO_FOLDER = 'Fotos';
+
+/**
+ * Foto eines Teilnehmers (Foto-Drop) im Ordner Fotos der Präsentation ablegen.
+ * Ist der Fotos-Ordner inzwischen gelöscht (404), wird er neu angelegt und es wird einmal wiederholt.
+ */
+export async function saveDropFile(env: DriveEnv, ids: IdMap, o: { deck: { id: string; title: string }; name: string; blob: Blob }) {
+  const ext = /\.[A-Za-z0-9]+$/.exec(o.name)?.[0] ?? '';
+  const name = safe(o.name.slice(0, o.name.length - ext.length)) + ext;
+  return inDeckFolder(env, ids, o.deck, async (folder) => {
+    try {
+      return await uploadFile(env, { name, folderId: await subFolder(env, ids, folder, PHOTO_FOLDER), blob: o.blob, kind: 'photo' });
+    } catch (e) {
+      if (!notFound(e)) throw e;
+      ids.set(`sub:${folder}:${PHOTO_FOLDER}`, '');
+      return uploadFile(env, { name, folderId: await subFolder(env, ids, folder, PHOTO_FOLDER), blob: o.blob, kind: 'photo' });
+    }
+  });
+}

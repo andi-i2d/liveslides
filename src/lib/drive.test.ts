@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearFolderCache, DriveError, getBlob, listDecks, listImages, saveDeck, saveResults, upsertJson, type DriveEnv, type IdMap } from './drive';
+import { clearFolderCache, DriveError, getBlob, listDecks, listImages, saveDeck, saveDropFile, saveResults, upsertJson, type DriveEnv, type IdMap } from './drive';
 import { domainAllowed } from './google';
 import { buildResults, resultsFileName } from './results';
 
@@ -17,7 +17,9 @@ function fakeDrive(opts: { preseed?: string[] } = {}) {
   const parseMultipart = (body: string, type: string) => {
     const b = /boundary=(.+)$/.exec(type)![1];
     const parts = body.split(`--${b}`).slice(1, -1).map((p) => p.split('\r\n\r\n').slice(1).join('\r\n\r\n').replace(/\r\n$/, ''));
-    return { meta: JSON.parse(parts[0]), content: JSON.parse(parts[1]) };
+    let content: unknown = parts[1];
+    try { content = JSON.parse(parts[1]); } catch { /* Binärdatei: Rohtext */ }
+    return { meta: JSON.parse(parts[0]), content };
   };
   const match = (f: F, query: string) => {
     const name = /(?:^|\s)name='((?:[^'\\]|\\.)*)'/.exec(query)?.[1];
@@ -40,6 +42,7 @@ function fakeDrive(opts: { preseed?: string[] } = {}) {
     const method = init.method ?? 'GET';
     calls.push({ method, url });
     const headers = (init.headers ?? {}) as Record<string, string>;
+    const bodyText = typeof init.body === 'string' ? init.body : init.body ? await new Response(init.body as Blob).text() : '';
     const upload = url.includes('/upload/');
     const fileId = /\/files\/([^/?]+)/.exec(url)?.[1];
     const id = fileId && decodeURIComponent(fileId);
@@ -47,12 +50,12 @@ function fakeDrive(opts: { preseed?: string[] } = {}) {
     if (upload && method === 'PATCH') {
       const f = id && files.get(id);
       if (!f) return json({ error: 'nf' }, 404);
-      const { meta, content } = parseMultipart(init.body as string, headers['Content-Type']);
+      const { meta, content } = parseMultipart(bodyText, headers['Content-Type']);
       Object.assign(f, { name: meta.name ?? f.name, json: content, modifiedTime: tick() });
       return json({ id: f.id });
     }
     if (upload && method === 'POST') {
-      const { meta, content } = parseMultipart(init.body as string, headers['Content-Type']);
+      const { meta, content } = parseMultipart(bodyText, headers['Content-Type']);
       if (meta.parents?.some((p: string) => !files.has(p))) return json({ error: 'parent nf' }, 404);
       const f: F = { id: `file${++n}`, name: meta.name, mimeType: meta.mimeType, parents: meta.parents ?? [], appProperties: meta.appProperties, json: content, modifiedTime: tick() };
       files.set(f.id, f);
@@ -254,6 +257,59 @@ describe('Drive: Bilder wählen', () => {
     const blob = await getBlob(d.env, 'i1');
     expect(JSON.parse(await blob.text())).toEqual({ bytes: 'i1' });
     expect(d.calls.at(-1)!.url).toContain('alt=media');
+  });
+});
+
+describe('Foto-Drop: Fotos der Teilnehmenden in Drive', () => {
+  const jpeg = (s = 'JPEGDATA') => new Blob([s], { type: 'image/jpeg' });
+
+  it('legt das Foto im Unterordner Fotos der Präsentation ab (Binär-Upload mit Typ und Marker)', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    const id = await saveDropFile(d.env, ids, { deck: deck('a1', 'Workshop'), name: '2026-11-25 10.00.00 Anna 1.jpg', blob: jpeg() });
+    const deckFolder = d.children('SHARED123')[0];
+    expect(deckFolder.name).toBe('Workshop');
+    const photos = d.children(deckFolder.id).find((f) => f.name === 'Fotos')!;
+    expect(photos.mimeType).toBe(FOLDER);
+    const file = d.files.get(id)!;
+    expect(file).toMatchObject({ name: '2026-11-25 10.00.00 Anna 1.jpg', mimeType: 'image/jpeg', parents: [photos.id], appProperties: { liveslides: 'photo' } });
+    expect(file.json).toBe('JPEGDATA'); // der Inhalt kommt unverändert an
+  });
+
+  it('weitere Fotos landen im selben Ordner (keine neuen Ordner), unzulässige Zeichen im Namen werden ersetzt, die Endung bleibt', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    await saveDropFile(d.env, ids, { deck: deck('a1', 'W'), name: 'x 1.jpg', blob: jpeg() });
+    const foldersBefore = [...d.files.values()].filter((f) => f.mimeType === FOLDER).length;
+    const id2 = await saveDropFile(d.env, ids, { deck: deck('a1', 'W'), name: 'Max/Muster: Foto 2.jpg', blob: jpeg() });
+    expect([...d.files.values()].filter((f) => f.mimeType === FOLDER).length).toBe(foldersBefore);
+    expect(d.files.get(id2)!.name).toBe('Max-Muster- Foto 2.jpg');
+  });
+
+  it('ein gelöschter Fotos-Ordner wird neu angelegt, das Foto geht nicht verloren', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    await saveDropFile(d.env, ids, { deck: deck('a1', 'W'), name: 'a 1.jpg', blob: jpeg('ERSTES') });
+    const deckFolder = d.children('SHARED123')[0];
+    const oldPhotos = d.children(deckFolder.id).find((f) => f.name === 'Fotos')!;
+    for (const c of d.children(oldPhotos.id)) d.files.delete(c.id);
+    d.files.delete(oldPhotos.id);
+    const id = await saveDropFile(d.env, ids, { deck: deck('a1', 'W'), name: 'a 2.jpg', blob: jpeg('ZWEITES') });
+    const newPhotos = d.children(deckFolder.id).filter((f) => f.name === 'Fotos');
+    expect(newPhotos).toHaveLength(1);
+    expect(d.files.get(id)).toMatchObject({ parents: [newPhotos[0].id], json: 'ZWEITES' });
+  });
+
+  it('Fotos erscheinen nicht in der Präsentationsliste und nicht als Ergebnisse', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    await saveDeck(d.env, ids, deck('a1', 'W'));
+    await saveDropFile(d.env, ids, { deck: deck('a1', 'W'), name: 'a 1.jpg', blob: jpeg() });
+    expect((await listDecks(d.env)).map((f) => f.name)).toEqual(['W.json']);
   });
 });
 
