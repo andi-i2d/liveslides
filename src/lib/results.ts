@@ -24,11 +24,11 @@ export function buildResults(deck: Deck, all: Record<string, Resp[]>, meta: Resu
   };
 }
 
-/** Dateiname: „2026-11-24 18.05 Titel – Ergebnisse (CODE)“ */
-export function resultsFileName(title: string, code: string, startedAt: number) {
+/** Dateiname: „2026-11-24 18.05 Ergebnisse (CODE)“; der Präsentationstitel steht im Namen des Ordners. */
+export function resultsFileName(code: string, startedAt: number) {
   const d = new Date(startedAt);
   const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())} ${title} – Ergebnisse (${code})`;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())} Ergebnisse (${code})`;
 }
 
 export const hasAnyResponse = (all: Record<string, Resp[]>) => Object.values(all).some((r) => r.length > 0);

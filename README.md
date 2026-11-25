@@ -37,14 +37,9 @@ Status: Auf der Live-Seite aktiv für Konten @i2d.info (GitHub-Variablen VITE_GO
 
 Ist `VITE_GOOGLE_CLIENT_ID` gesetzt, müssen sich Organisatoren (Startseite, Editor, Präsentator) mit Google anmelden.
 Teilnehmer (`#/join/…`) brauchen **keine** Anmeldung. Angemeldete Nutzer bekommen:
-- **Decks in Drive:** Änderungen im Editor werden automatisch als `LiveSlides/Präsentationen/<Titel>.json` gesichert;
-  auf der Startseite lassen sie sich aus Drive wieder laden.
-- **Ergebnisse in Drive:** Während der Präsentation (5 s nach der letzten Antwort, bei Folienwechsel, beim Verlassen und
-  per ☁-Knopf) entsteht `LiveSlides/Ergebnisse/<Datum> <Titel> – Ergebnisse (<Code>).json` mit allen Antworten je Folie,
-  Namen, Zeitstempeln und der Rangliste.
+- **Ablage in Drive:** Im Wurzelordner (`VITE_DRIVE_FOLDER_ID`, hier der geteilte i2d-Ordner) entsteht **je Präsentation ein Unterordner** mit dem Titel der Präsentation. Darin liegen die Präsentation (`<Titel>.json`, wird bei jeder Änderung im Editor überschrieben) und je Durchlauf eine Ergebnisdatei (`<Datum> <Uhrzeit> Ergebnisse (<Code>).json` mit allen Antworten je Folie, Namen, Zeitstempeln und Rangliste; gesichert 5 s nach der letzten Antwort, bei Folienwechsel, beim Verlassen und per ☁-Knopf). Ohne Ordner-ID wird stattdessen „LiveSlides“ im eigenen Drive als Wurzel angelegt. Der Ordner wird über die Präsentations-ID gefunden und bei Titeländerung umbenannt; zwei Präsentationen mit gleichem Titel bekommen getrennte Ordner. Auf der Startseite lassen sich Präsentationen aus Drive wieder laden.
 - Optional `VITE_ALLOWED_DOMAIN` (z. B. `i2d.de`): Konten anderer Domains werden abgelehnt.
-- Optional `VITE_DRIVE_FOLDER_ID`: fester Zielordner (z. B. im geteilten Laufwerk). Dafür wird der volle Drive-Zugriff
-  angefordert; ohne diese Variable genügt `drive.file` (die App sieht nur Dateien, die sie selbst angelegt hat).
+- `VITE_DRIVE_FOLDER_ID`: ID des Wurzelordners (der Teil hinter `/folders/` in der Drive-URL). Dafür wird der **volle Drive-Zugriff** (`…/auth/drive`) angefordert, auch dieser Bereich muss in der Google Auth Platform unter *Datenzugriff* eingetragen sein; das Konto braucht im Ordner mindestens die Rolle „Mitwirkender“. Ohne diese Variable genügt `drive.file` (die App sieht nur Dateien, die sie selbst angelegt hat).
 
 **Einrichtung in der Google Cloud Console** (am besten mit einem Konto der Organisation):
 1. Projekt anlegen und unter *APIs & Dienste → Bibliothek* die **Google Drive API** aktivieren.

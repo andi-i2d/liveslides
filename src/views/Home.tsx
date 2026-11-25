@@ -49,7 +49,7 @@ function DriveImport({ onImported }: { onImported: () => void }) {
       {files && files.length === 0 && <p class="hint">{t('cloud.empty')}</p>}
       {files?.map((f) => (
         <div class="row-item">
-          <span>{f.name.replace(/\.json$/, '')}</span>
+          <span>{f.folder ?? f.name.replace(/\.json$/, '')}</span>
           <small class="hint">{new Date(f.modifiedTime).toLocaleString()}</small>
           <span class="grow" />
           <button class="btn" onClick={() => imp(f)}>{t('cloud.import')}</button>

@@ -1,16 +1,24 @@
-/** Dünner Google-Drive-Client (REST v3). `fetch` und Token sind austauschbar, damit alles testbar bleibt. */
+/**
+ * Dünner Google-Drive-Client (REST v3). `fetch` und Token sind austauschbar, damit alles testbar bleibt.
+ *
+ * Ablage:  <Wurzelordner>/<Präsentationstitel>/<Titel>.json                          (die Präsentation)
+ *                                              /<Datum> Ergebnisse (<Code>).json      (je Durchlauf)
+ * Wurzelordner = `folderId` (z. B. Ordner im geteilten Laufwerk), sonst „LiveSlides“ im eigenen Drive.
+ */
 export interface DriveEnv {
   token(): Promise<string>;
   fetch?: typeof fetch;
-  /** Fester Zielordner (z. B. im geteilten Laufwerk). Sonst wird „LiveSlides“ im eigenen Drive angelegt. */
+  /** Fester Wurzelordner (z. B. im geteilten Laufwerk). Sonst wird „LiveSlides“ im eigenen Drive angelegt. */
   folderId?: string;
 }
+/** Merkt Drive-IDs pro Gerät. Ein leerer Wert gilt als „unbekannt“. */
 export interface IdMap { get(k: string): string | null; set(k: string, v: string): void }
 
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const FOLDER = 'application/vnd.google-apps.folder';
 const SHARED = 'supportsAllDrives=true';
+const ALL = `${SHARED}&includeItemsFromAllDrives=true`;
 
 export class DriveError extends Error {
   constructor(public status: number, message: string) {
@@ -28,40 +36,82 @@ async function call(env: DriveEnv, url: string, init: RequestInit = {}) {
 }
 
 const q = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+const enc = encodeURIComponent;
+const notFound = (e: unknown) => e instanceof DriveError && e.status === 404;
+
+/** Nur von dieser App gelesene Markierungen an Dateien/Ordnern (appProperties sind für andere Apps unsichtbar). */
+export const APP = 'liveslides';
+
+async function list<T>(env: DriveEnv, query: string, fields: string, extra = ''): Promise<T[]> {
+  const r = await call(env, `${API}/files?q=${enc(query)}&fields=files(${fields})&pageSize=200&${ALL}${extra}`);
+  return (await r.json()).files ?? [];
+}
 
 export async function findFolder(env: DriveEnv, name: string, parent?: string): Promise<string | null> {
   const query = [`name='${q(name)}'`, `mimeType='${FOLDER}'`, 'trashed=false', parent ? `'${q(parent)}' in parents` : null].filter(Boolean).join(' and ');
-  const r = await call(env, `${API}/files?q=${encodeURIComponent(query)}&fields=files(id)&pageSize=1&${SHARED}&includeItemsFromAllDrives=true`);
-  return (await r.json()).files?.[0]?.id ?? null;
+  return (await list<{ id: string }>(env, query, 'id'))[0]?.id ?? null;
 }
 
-export async function ensureFolder(env: DriveEnv, name: string, parent?: string): Promise<string> {
-  const found = await findFolder(env, name, parent);
-  if (found) return found;
+async function createFolder(env: DriveEnv, name: string, parent?: string, appProperties?: Record<string, string>): Promise<string> {
   const r = await call(env, `${API}/files?fields=id&${SHARED}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, mimeType: FOLDER, ...(parent ? { parents: [parent] } : {}) }),
+    body: JSON.stringify({ name, mimeType: FOLDER, ...(parent ? { parents: [parent] } : {}), ...(appProperties ? { appProperties } : {}) }),
   });
   return (await r.json()).id;
 }
 
-const folderCache = new Map<string, Promise<string>>();
-/** Wurzel + Unterordner (z. B. „Präsentationen“, „Ergebnisse“); pro Sitzung zwischengespeichert. */
-export function folderFor(env: DriveEnv, sub: string): Promise<string> {
-  const key = `${env.folderId ?? 'root'}/${sub}`;
-  let p = folderCache.get(key);
+export async function ensureFolder(env: DriveEnv, name: string, parent?: string): Promise<string> {
+  return (await findFolder(env, name, parent)) ?? createFolder(env, name, parent);
+}
+
+const rootCache = new Map<string, Promise<string>>();
+/** Wurzelordner: der konfigurierte Ordner oder „LiveSlides“ im eigenen Drive (pro Sitzung zwischengespeichert). */
+export function rootFolder(env: DriveEnv): Promise<string> {
+  if (env.folderId) return Promise.resolve(env.folderId);
+  let p = rootCache.get('LiveSlides');
   if (!p) {
-    p = (async () => {
-      const root = env.folderId || (await ensureFolder(env, 'LiveSlides'));
-      return ensureFolder(env, sub, root);
-    })();
-    p.catch(() => folderCache.delete(key));
-    folderCache.set(key, p);
+    p = ensureFolder(env, 'LiveSlides');
+    p.catch(() => rootCache.delete('LiveSlides'));
+    rootCache.set('LiveSlides', p);
   }
   return p;
 }
-export const clearFolderCache = () => folderCache.clear();
+export const clearFolderCache = () => rootCache.clear();
+
+const safe = (s: string) => s.replace(/[\\/:*?"<>|]/g, '-').trim().slice(0, 80) || 'Ohne Titel';
+
+/**
+ * Unterordner einer Präsentation. Gefunden wird er über die Deck-ID (nicht über den Namen), daher bleibt er auch nach
+ * Umbenennung derselbe; ändert sich der Titel, wird der Ordner umbenannt. Zwei Präsentationen mit gleichem Titel
+ * bekommen getrennte Ordner.
+ */
+export async function deckFolder(env: DriveEnv, ids: IdMap, deck: { id: string; title: string }): Promise<string> {
+  const idKey = `folder:${deck.id}`;
+  const nameKey = `foldername:${deck.id}`;
+  const name = safe(deck.title);
+  const known = ids.get(idKey);
+  if (known) {
+    if (ids.get(nameKey) !== name) {
+      try {
+        await call(env, `${API}/files/${enc(known)}?fields=id&${SHARED}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+        });
+        ids.set(nameKey, name);
+      } catch (e) {
+        if (notFound(e)) { ids.set(idKey, ''); return deckFolder(env, ids, deck); } // Ordner wurde gelöscht → neu anlegen
+        // andere Fehler (z. B. keine Umbenennungsrechte): Ordner weiter verwenden
+      }
+    }
+    return known;
+  }
+  const root = await rootFolder(env);
+  const found = (await list<{ id: string }>(env, `'${q(root)}' in parents and mimeType='${FOLDER}' and trashed=false and appProperties has { key='deckId' and value='${q(deck.id)}' }`, 'id'))[0]?.id;
+  const id = found ?? (await createFolder(env, name, root, { [APP]: 'deckfolder', deckId: deck.id }));
+  ids.set(idKey, id);
+  ids.set(nameKey, found ? '' : name); // gefundener Ordner: Name beim nächsten Speichern angleichen
+  return id;
+}
 
 function multipart(meta: unknown, json: unknown) {
   const b = 'ls' + Math.random().toString(36).slice(2);
@@ -72,54 +122,77 @@ function multipart(meta: unknown, json: unknown) {
 /** Datei anlegen oder (wenn bekannt) überschreiben. Fehlt die alte Datei, wird neu angelegt. */
 export async function upsertJson(
   env: DriveEnv,
-  o: { name: string; folderId: string; fileId?: string | null; json: unknown },
+  o: { name: string; folderId: string; fileId?: string | null; json: unknown; kind?: 'deck' | 'results' },
 ): Promise<string> {
   if (o.fileId) {
     const m = multipart({ name: o.name }, o.json);
     try {
-      const r = await call(env, `${UPLOAD}/files/${encodeURIComponent(o.fileId)}?uploadType=multipart&fields=id&${SHARED}`, {
+      const r = await call(env, `${UPLOAD}/files/${enc(o.fileId)}?uploadType=multipart&fields=id&${SHARED}`, {
         method: 'PATCH', headers: { 'Content-Type': m.type }, body: m.body,
       });
       return (await r.json()).id;
     } catch (e) {
-      if (!(e instanceof DriveError) || e.status !== 404) throw e;
+      if (!notFound(e)) throw e;
     }
   }
-  const m = multipart({ name: o.name, parents: [o.folderId], mimeType: 'application/json' }, o.json);
+  const meta = { name: o.name, parents: [o.folderId], mimeType: 'application/json', appProperties: { [APP]: o.kind ?? 'deck' } };
+  const m = multipart(meta, o.json);
   const r = await call(env, `${UPLOAD}/files?uploadType=multipart&fields=id&${SHARED}`, {
     method: 'POST', headers: { 'Content-Type': m.type }, body: m.body,
   });
   return (await r.json()).id;
 }
 
-export interface DriveFile { id: string; name: string; modifiedTime: string }
-export async function listJson(env: DriveEnv, sub: string): Promise<DriveFile[]> {
-  const folder = await folderFor(env, sub);
-  const query = `'${q(folder)}' in parents and trashed=false`;
-  const r = await call(env, `${API}/files?q=${encodeURIComponent(query)}&orderBy=modifiedTime desc&pageSize=50&fields=files(id,name,modifiedTime)&${SHARED}&includeItemsFromAllDrives=true`);
-  return (await r.json()).files ?? [];
+/** Fehlt der Präsentationsordner (404, z. B. gelöscht), Ordner neu anlegen und einmal wiederholen. */
+async function inDeckFolder(env: DriveEnv, ids: IdMap, deck: { id: string; title: string }, fn: (folder: string) => Promise<string>) {
+  try {
+    return await fn(await deckFolder(env, ids, deck));
+  } catch (e) {
+    if (!notFound(e)) throw e;
+    ids.set(`folder:${deck.id}`, '');
+    return fn(await deckFolder(env, ids, deck));
+  }
 }
-
-export async function getJson<T = unknown>(env: DriveEnv, id: string): Promise<T> {
-  const r = await call(env, `${API}/files/${encodeURIComponent(id)}?alt=media&${SHARED}`);
-  return r.json();
-}
-
-const safe = (s: string) => s.replace(/[\\/:*?"<>|]/g, '-').trim().slice(0, 80) || 'Ohne Titel';
-
-export const DECK_FOLDER = 'Präsentationen';
-export const RESULT_FOLDER = 'Ergebnisse';
 
 export async function saveDeck(env: DriveEnv, ids: IdMap, deck: { id: string; title: string }) {
   const key = `deck:${deck.id}`;
-  const id = await upsertJson(env, { name: `${safe(deck.title)}.json`, folderId: await folderFor(env, DECK_FOLDER), fileId: ids.get(key), json: deck });
+  const id = await inDeckFolder(env, ids, deck, (folder) =>
+    upsertJson(env, { name: `${safe(deck.title)}.json`, folderId: folder, fileId: ids.get(key), json: deck, kind: 'deck' }));
   ids.set(key, id);
   return id;
 }
 
-export async function saveResults(env: DriveEnv, ids: IdMap, o: { sessionId: string; name: string; json: unknown }) {
+export async function saveResults(
+  env: DriveEnv,
+  ids: IdMap,
+  o: { deck: { id: string; title: string }; sessionId: string; name: string; json: unknown },
+) {
   const key = `res:${o.sessionId}`;
-  const id = await upsertJson(env, { name: `${safe(o.name)}.json`, folderId: await folderFor(env, RESULT_FOLDER), fileId: ids.get(key), json: o.json });
+  const id = await inDeckFolder(env, ids, o.deck, (folder) =>
+    upsertJson(env, { name: `${safe(o.name)}.json`, folderId: folder, fileId: ids.get(key), json: o.json, kind: 'results' }));
   ids.set(key, id);
   return id;
+}
+
+export interface DriveFile { id: string; name: string; modifiedTime: string; folder?: string }
+
+/** Alle gespeicherten Präsentationen (je Präsentationsordner unter dem Wurzelordner), neueste zuerst. */
+export async function listDecks(env: DriveEnv): Promise<DriveFile[]> {
+  const root = await rootFolder(env);
+  const folders = await list<{ id: string; name: string }>(env, `'${q(root)}' in parents and mimeType='${FOLDER}' and trashed=false`, 'id,name');
+  const byId = new Map(folders.map((f) => [f.id, f.name]));
+  const files = await list<{ id: string; name: string; modifiedTime: string; parents?: string[] }>(
+    env,
+    `appProperties has { key='${APP}' and value='deck' } and trashed=false`,
+    'id,name,modifiedTime,parents',
+    '&corpora=allDrives&orderBy=modifiedTime desc',
+  );
+  return files
+    .filter((f) => f.parents?.some((p) => byId.has(p)))
+    .map((f) => ({ id: f.id, name: f.name, modifiedTime: f.modifiedTime, folder: byId.get(f.parents!.find((p) => byId.has(p))!) }));
+}
+
+export async function getJson<T = unknown>(env: DriveEnv, id: string): Promise<T> {
+  const r = await call(env, `${API}/files/${enc(id)}?alt=media&${SHARED}`);
+  return r.json();
 }

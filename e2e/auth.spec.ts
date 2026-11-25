@@ -43,9 +43,11 @@ async function fakeGoogle(ctx: BrowserContext, who: string) {
   return { uploads, folders };
 }
 
-async function signIn(page: Page) {
+async function signIn(page: Page, email = 'anna@i2d.test') {
   await page.goto('/');
   await page.getByRole('button', { name: 'Mit Google anmelden' }).click();
+  // Auf den abgeschlossenen Login warten: erst dann ist das Konto für die stille Wiederanmeldung nach einem Neuladen gemerkt.
+  await expect(page.getByText(email)).toBeVisible();
 }
 
 test('ohne Anmeldung ist nur die Login-Seite erreichbar, Teilnehmer-Link nicht', async ({ context, page }) => {
@@ -59,7 +61,8 @@ test('ohne Anmeldung ist nur die Login-Seite erreichbar, Teilnehmer-Link nicht',
 
 test('Konto außerhalb der Domain wird abgelehnt', async ({ context, page }) => {
   await fakeGoogle(context, 'fremd@gmail.com');
-  await signIn(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Mit Google anmelden' }).click(); // Login schlägt hier absichtlich fehl
   await expect(page.getByRole('alert')).toContainText('nicht zugelassen');
   await expect(page.getByRole('heading', { name: 'Meine Präsentationen' })).toHaveCount(0);
 });
@@ -89,7 +92,7 @@ test('Anmeldung mit i2d-Konto, Deck und Ergebnisse landen in Drive', async ({ co
   await page.getByTitle('Jetzt in Drive speichern').click();
   await expect(page.getByRole('button', { name: /In Drive gespeichert/ })).toBeVisible();
 
-  expect(drive.folders).toEqual(['LiveSlides', 'Ergebnisse']);
+  expect(drive.folders).toEqual(['LiveSlides', 'Mein Deck']); // ein Unterordner je Präsentation, darin Deck und Ergebnisse
   const res = drive.uploads.find((u) => u.body.includes('Ergebnisse (' + code + ')'));
   expect(res, 'Ergebnisdatei wurde hochgeladen').toBeTruthy();
   expect(res!.body).toContain('"answer":"paris"');
@@ -118,5 +121,5 @@ test('Editor sichert Änderungen als Deck-Datei in Drive', async ({ context, pag
   });
   await title.fill('Neuer Titel');
   await expect.poll(() => drive.uploads.some((u) => u.body.includes('Neuer Titel.json')), { timeout: 10_000 }).toBe(true);
-  expect(drive.folders).toEqual(['LiveSlides', 'Präsentationen']);
+  expect(drive.folders).toEqual(['LiveSlides', 'Neuer Titel']); // Ordner trägt den Präsentationstitel
 });

@@ -63,8 +63,8 @@ export function cloudSaveDeck(deck: Deck) {
 export function cloudSaveResults(deck: Deck, all: Record<string, Resp[]>, meta: ResultsMeta & { sessionId: string }) {
   if (!cloudReady()) return Promise.resolve();
   const json = buildResults(deck, all, { ...meta, savedAt: Date.now() });
-  return enqueue(() => drive.saveResults(env(), ids, { sessionId: meta.sessionId, name: resultsFileName(deck.title, meta.code, meta.startedAt), json }));
+  return enqueue(() => drive.saveResults(env(), ids, { deck: { id: deck.id, title: deck.title }, sessionId: meta.sessionId, name: resultsFileName(meta.code, meta.startedAt), json }));
 }
 
-export const cloudListDecks = () => drive.listJson(env(), drive.DECK_FOLDER);
+export const cloudListDecks = () => drive.listDecks(env());
 export const cloudLoadDeck = (id: string) => drive.getJson<Deck>(env(), id);

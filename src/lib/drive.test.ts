@@ -1,107 +1,232 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearFolderCache, saveDeck, saveResults, upsertJson, type DriveEnv, type IdMap } from './drive';
+import { clearFolderCache, DriveError, listDecks, saveDeck, saveResults, upsertJson, type DriveEnv, type IdMap } from './drive';
 import { domainAllowed } from './google';
 import { buildResults, resultsFileName } from './results';
 
-interface Call { method: string; url: string; body?: string }
+interface F { id: string; name: string; mimeType: string; parents: string[]; appProperties?: Record<string, string>; json?: unknown; modifiedTime: string }
+const FOLDER = 'application/vnd.google-apps.folder';
 
-/** Minimaler Drive-Simulator: Ordner und Dateien im Speicher. */
-function fakeDrive(opts: { missing?: Set<string> } = {}) {
-  const calls: Call[] = [];
-  const folders = new Map<string, string>(); // "name|parent" → id
+/** Minimaler Drive-Simulator: Ordner und Dateien im Speicher, inkl. Abfragen (q), Umbenennen, Multipart-Upload. */
+function fakeDrive(opts: { preseed?: string[] } = {}) {
+  const files = new Map<string, F>();
+  const calls: { method: string; url: string }[] = [];
   let n = 0;
-  const f = (async (url: string, init: RequestInit = {}) => {
+  const tick = () => new Date(2026, 0, 1, 0, 0, ++n).toISOString();
+  for (const id of opts.preseed ?? []) files.set(id, { id, name: id, mimeType: FOLDER, parents: [], modifiedTime: tick() });
+
+  const parseMultipart = (body: string, type: string) => {
+    const b = /boundary=(.+)$/.exec(type)![1];
+    const parts = body.split(`--${b}`).slice(1, -1).map((p) => p.split('\r\n\r\n').slice(1).join('\r\n\r\n').replace(/\r\n$/, ''));
+    return { meta: JSON.parse(parts[0]), content: JSON.parse(parts[1]) };
+  };
+  const match = (f: F, query: string) => {
+    const name = /(?:^|\s)name='((?:[^'\\]|\\.)*)'/.exec(query)?.[1];
+    const mime = /mimeType='([^']+)'/.exec(query)?.[1];
+    const parent = /'((?:[^'\\]|\\.)*)' in parents/.exec(query)?.[1];
+    const prop = /appProperties has \{ key='([^']+)' and value='((?:[^'\\]|\\.)*)' \}/.exec(query);
+    if (name !== undefined && f.name !== name.replace(/\\'/g, "'")) return false;
+    if (mime && f.mimeType !== mime) return false;
+    if (parent && !f.parents.includes(parent)) return false;
+    if (prop && f.appProperties?.[prop[1]] !== prop[2]) return false;
+    return true;
+  };
+  const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status });
+
+  const fetchFn = (async (url: string, init: RequestInit = {}) => {
     const method = init.method ?? 'GET';
-    calls.push({ method, url, body: init.body as string | undefined });
-    const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status });
-    if (url.includes('/upload/') && method === 'PATCH') {
-      const id = decodeURIComponent(url.split('/files/')[1].split('?')[0]);
-      return opts.missing?.has(id) ? json({ error: 'nf' }, 404) : json({ id });
+    calls.push({ method, url });
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    const upload = url.includes('/upload/');
+    const fileId = /\/files\/([^/?]+)/.exec(url)?.[1];
+    const id = fileId && decodeURIComponent(fileId);
+
+    if (upload && method === 'PATCH') {
+      const f = id && files.get(id);
+      if (!f) return json({ error: 'nf' }, 404);
+      const { meta, content } = parseMultipart(init.body as string, headers['Content-Type']);
+      Object.assign(f, { name: meta.name ?? f.name, json: content, modifiedTime: tick() });
+      return json({ id: f.id });
     }
-    if (url.includes('/upload/') && method === 'POST') return json({ id: `file${++n}` });
+    if (upload && method === 'POST') {
+      const { meta, content } = parseMultipart(init.body as string, headers['Content-Type']);
+      if (meta.parents?.some((p: string) => !files.has(p))) return json({ error: 'parent nf' }, 404);
+      const f: F = { id: `file${++n}`, name: meta.name, mimeType: meta.mimeType, parents: meta.parents ?? [], appProperties: meta.appProperties, json: content, modifiedTime: tick() };
+      files.set(f.id, f);
+      return json({ id: f.id });
+    }
+    if (method === 'PATCH') {
+      const f = id && files.get(id);
+      if (!f) return json({ error: 'nf' }, 404);
+      Object.assign(f, JSON.parse(init.body as string), { modifiedTime: tick() });
+      return json({ id: f.id });
+    }
     if (method === 'POST') {
       const b = JSON.parse(init.body as string);
-      const id = `folder${++n}`;
-      folders.set(`${b.name}|${b.parents?.[0] ?? ''}`, id);
-      return json({ id });
+      if (b.parents?.some((p: string) => !files.has(p))) return json({ error: 'parent nf' }, 404);
+      const f: F = { id: `folder${++n}`, name: b.name, mimeType: b.mimeType, parents: b.parents ?? [], appProperties: b.appProperties, modifiedTime: tick() };
+      files.set(f.id, f);
+      return json({ id: f.id });
     }
-    const q = decodeURIComponent(url.split('q=')[1].split('&')[0]);
-    const name = /name='([^']+)'/.exec(q)?.[1] ?? '';
-    const parent = /'([^']+)' in parents/.exec(q)?.[1] ?? '';
-    const id = folders.get(`${name}|${parent}`);
-    return json({ files: id ? [{ id }] : [] });
+    if (url.includes('alt=media')) return json(files.get(id!)?.json ?? null);
+    const query = decodeURIComponent(/[?&]q=([^&]*)/.exec(url)![1]);
+    let out = [...files.values()].filter((f) => match(f, query));
+    if (url.includes('orderBy=modifiedTime')) out = out.sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime));
+    return json({ files: out });
   }) as unknown as typeof fetch;
-  return { calls, env: { token: async () => 'T', fetch: f } as DriveEnv };
+
+  const children = (parent: string) => [...files.values()].filter((f) => f.parents.includes(parent));
+  return { files, calls, children, env: { token: async () => 'T', fetch: fetchFn } as DriveEnv };
 }
 const memMap = (): IdMap & { m: Record<string, string> } => {
   const m: Record<string, string> = {};
-  return { m, get: (k) => m[k] ?? null, set: (k, v) => void (m[k] = v) };
+  return { m, get: (k) => m[k] || null, set: (k, v) => void (m[k] = v) };
 };
+const deck = (id: string, title: string) => ({ id, title });
 
 beforeEach(() => clearFolderCache());
 
-describe('Drive', () => {
-  it('legt LiveSlides/Präsentationen an und speichert das Deck mit Bearer-Token', async () => {
-    const d = fakeDrive();
-    const ids = memMap();
-    const id = await saveDeck(d.env, ids, { id: 'a1', title: 'Mein: Deck/1' });
-    expect(id).toMatch(/^file/);
-    expect(ids.m['deck:a1']).toBe(id);
-    const creates = d.calls.filter((c) => c.method === 'POST' && !c.url.includes('/upload/')).map((c) => JSON.parse(c.body!));
-    expect(creates.map((c) => c.name)).toEqual(['LiveSlides', 'Präsentationen']);
-    const up = d.calls.find((c) => c.url.includes('/upload/'))!;
-    expect(up.body).toContain('"name":"Mein- Deck-1.json"'); // unzulässige Zeichen ersetzt
-  });
-  it('überschreibt beim zweiten Speichern statt neu anzulegen', async () => {
-    const d = fakeDrive();
-    const ids = memMap();
-    const first = await saveDeck(d.env, ids, { id: 'a1', title: 'T' });
-    await saveDeck(d.env, ids, { id: 'a1', title: 'T2' });
-    const patches = d.calls.filter((c) => c.method === 'PATCH');
-    expect(patches).toHaveLength(1);
-    expect(patches[0].url).toContain(first);
-    expect(d.calls.filter((c) => c.method === 'POST' && c.url.includes('/upload/'))).toHaveLength(1);
-  });
-  it('legt neu an, wenn die alte Datei gelöscht wurde (404)', async () => {
-    const d = fakeDrive({ missing: new Set(['gone']) });
-    const id = await upsertJson(d.env, { name: 'x.json', folderId: 'F', fileId: 'gone', json: {} });
-    expect(id).toMatch(/^file/);
-  });
-  it('nutzt einen festen Zielordner statt LiveSlides anzulegen', async () => {
-    const d = fakeDrive();
+describe('Drive: ein Unterordner je Präsentation', () => {
+  it('legt <Titel> im konfigurierten Wurzelordner an und speichert dort die JSON', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
     d.env.folderId = 'SHARED123';
-    await saveResults(d.env, memMap(), { sessionId: 's', name: 'Ergebnis', json: { a: 1 } });
-    const creates = d.calls.filter((c) => c.method === 'POST' && !c.url.includes('/upload/')).map((c) => JSON.parse(c.body!));
-    expect(creates).toEqual([{ name: 'Ergebnisse', mimeType: 'application/vnd.google-apps.folder', parents: ['SHARED123'] }]);
+    const ids = memMap();
+    const fileId = await saveDeck(d.env, ids, deck('a1', 'Mein: Deck/1'));
+    const folders = d.children('SHARED123');
+    expect(folders).toHaveLength(1);
+    expect(folders[0]).toMatchObject({ name: 'Mein- Deck-1', mimeType: FOLDER, appProperties: { liveslides: 'deckfolder', deckId: 'a1' } }); // unzulässige Zeichen ersetzt
+    const inside = d.children(folders[0].id);
+    expect(inside).toHaveLength(1);
+    expect(inside[0]).toMatchObject({ id: fileId, name: 'Mein- Deck-1.json', appProperties: { liveslides: 'deck' } });
+    expect(d.calls.filter((c) => c.method === 'POST' && !c.url.includes('/upload/'))).toHaveLength(1); // kein LiveSlides-Ordner
   });
-  it('meldet Drive-Fehler mit Status', async () => {
-    const env: DriveEnv = { token: async () => 'T', fetch: (async () => new Response('nope', { status: 403 })) as unknown as typeof fetch };
-    await expect(saveDeck(env, memMap(), { id: 'a', title: 'T' })).rejects.toMatchObject({ status: 403 });
+
+  it('zweites Speichern überschreibt die Datei, ohne neuen Ordner oder neue Datei', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    const first = await saveDeck(d.env, ids, deck('a1', 'Titel'));
+    await saveDeck(d.env, ids, deck('a1', 'Titel'));
+    expect(d.children('SHARED123')).toHaveLength(1);
+    const folder = d.children('SHARED123')[0];
+    expect(d.children(folder.id).map((f) => f.id)).toEqual([first]);
+    expect(d.calls.filter((c) => c.method === 'PATCH')).toHaveLength(1);
+  });
+
+  it('Titeländerung benennt den Ordner und die Datei um, statt neu anzulegen', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    await saveDeck(d.env, ids, deck('a1', 'Alt'));
+    await saveDeck(d.env, ids, deck('a1', 'Neu'));
+    const folders = d.children('SHARED123');
+    expect(folders.map((f) => f.name)).toEqual(['Neu']);
+    expect(d.children(folders[0].id).map((f) => f.name)).toEqual(['Neu.json']);
+  });
+
+  it('Ergebnisse jedes Durchlaufs landen im Ordner der Präsentation, ein Durchlauf bleibt eine Datei', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    await saveDeck(d.env, ids, deck('a1', 'Workshop'));
+    const r = (sessionId: string, name: string, v: number) => saveResults(d.env, ids, { deck: deck('a1', 'Workshop'), sessionId, name, json: { v } });
+    await r('s1', '2026-11-25 10.00 Ergebnisse (AAAAA)', 1);
+    await r('s1', '2026-11-25 10.00 Ergebnisse (AAAAA)', 2); // gleicher Durchlauf: überschreibt
+    await r('s2', '2026-11-25 14.00 Ergebnisse (BBBBB)', 3);
+    const folder = d.children('SHARED123')[0];
+    const inside = d.children(folder.id);
+    expect(d.children('SHARED123')).toHaveLength(1);
+    expect(inside.map((f) => f.name).sort()).toEqual(['2026-11-25 10.00 Ergebnisse (AAAAA).json', '2026-11-25 14.00 Ergebnisse (BBBBB).json', 'Workshop.json']);
+    expect(inside.find((f) => f.name.includes('AAAAA'))!.json).toEqual({ v: 2 });
+    expect(inside.filter((f) => f.appProperties?.liveslides === 'results')).toHaveLength(2);
+  });
+
+  it('ohne Ordner-ID: „LiveSlides“ im eigenen Drive ist die Wurzel', async () => {
+    const d = fakeDrive();
+    await saveDeck(d.env, memMap(), deck('a1', 'Titel'));
+    const top = [...d.files.values()].filter((f) => f.parents.length === 0);
+    expect(top.map((f) => f.name)).toEqual(['LiveSlides']);
+    expect(d.children(top[0].id).map((f) => f.name)).toEqual(['Titel']);
+  });
+
+  it('zwei Präsentationen mit gleichem Titel bekommen getrennte Ordner', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    await saveDeck(d.env, ids, deck('a1', 'Gleich'));
+    await saveDeck(d.env, ids, deck('b2', 'Gleich'));
+    expect(d.children('SHARED123')).toHaveLength(2);
+  });
+
+  it('ein anderes Gerät (ohne gemerkte IDs) findet den Ordner über die Deck-ID und legt keinen zweiten an', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    await saveDeck(d.env, memMap(), deck('a1', 'Titel'));
+    await saveDeck(d.env, memMap(), deck('a1', 'Titel'));
+    expect(d.children('SHARED123')).toHaveLength(1);
+  });
+
+  it('gelöschter Ordner (404): wird neu angelegt und die Datei trotzdem gespeichert', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    await saveDeck(d.env, ids, deck('a1', 'Titel'));
+    for (const f of d.children('SHARED123')) { for (const c of d.children(f.id)) d.files.delete(c.id); d.files.delete(f.id); }
+    const id = await saveDeck(d.env, ids, deck('a1', 'Titel'));
+    const folders = d.children('SHARED123');
+    expect(folders).toHaveLength(1);
+    expect(d.children(folders[0].id).map((f) => f.id)).toEqual([id]);
+  });
+
+  it('upsertJson legt neu an, wenn die alte Datei weg ist (404)', async () => {
+    const d = fakeDrive({ preseed: ['F'] });
+    const id = await upsertJson(d.env, { name: 'x.json', folderId: 'F', fileId: 'gone', json: {} });
+    expect(d.files.get(id)?.parents).toEqual(['F']);
+  });
+
+  it('meldet Drive-Fehler mit Status (z. B. keine Berechtigung)', async () => {
+    const env: DriveEnv = { token: async () => 'T', folderId: 'X', fetch: (async () => new Response('nope', { status: 403 })) as unknown as typeof fetch };
+    const err = await saveDeck(env, memMap(), deck('a', 'T')).catch((e) => e);
+    expect(err).toBeInstanceOf(DriveError);
+    expect(err.status).toBe(403);
+  });
+});
+
+describe('Drive: Präsentationen auflisten', () => {
+  it('findet die Deck-Dateien der Unterordner, neueste zuerst, mit Ordnername; ignoriert Ergebnisse und Fremdes', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123', 'ANDERER'] });
+    d.env.folderId = 'SHARED123';
+    const ids = memMap();
+    await saveDeck(d.env, ids, deck('a1', 'Erste'));
+    await saveDeck(d.env, ids, deck('b2', 'Zweite'));
+    await saveResults(d.env, ids, { deck: deck('a1', 'Erste'), sessionId: 's', name: 'Ergebnisse', json: {} });
+    await upsertJson(d.env, { name: 'Fremd.json', folderId: 'ANDERER', json: {}, kind: 'deck' }); // Deck-Datei außerhalb des Wurzelordners
+    const list = await listDecks(d.env);
+    expect(list.map((f) => [f.folder, f.name])).toEqual([['Zweite', 'Zweite.json'], ['Erste', 'Erste.json']]);
   });
 });
 
 describe('Domain-Prüfung', () => {
   it('ohne Vorgabe darf jeder, mit Vorgabe nur die Firmen-Domain', () => {
     expect(domainAllowed({ email: 'x@gmail.com' }, '')).toBe(true);
-    expect(domainAllowed({ email: 'a@i2d.de', email_verified: true }, 'i2d.de')).toBe(true);
-    expect(domainAllowed({ email: 'a@alias.de', hd: 'I2D.de' }, 'i2d.de')).toBe(true);
-    expect(domainAllowed({ email: 'a@gmail.com' }, 'i2d.de')).toBe(false);
-    expect(domainAllowed({ email: 'a@evil-i2d.de' }, 'i2d.de')).toBe(false);
-    expect(domainAllowed({ email: 'a@i2d.de', email_verified: false }, 'i2d.de')).toBe(false);
-    expect(domainAllowed({}, 'i2d.de')).toBe(false);
+    expect(domainAllowed({ email: 'a@i2d.info', email_verified: true }, 'i2d.info')).toBe(true);
+    expect(domainAllowed({ email: 'a@alias.de', hd: 'I2D.info' }, 'i2d.info')).toBe(true);
+    expect(domainAllowed({ email: 'a@gmail.com' }, 'i2d.info')).toBe(false);
+    expect(domainAllowed({ email: 'a@evil-i2d.info' }, 'i2d.info')).toBe(false);
+    expect(domainAllowed({ email: 'a@i2d.info', email_verified: false }, 'i2d.info')).toBe(false);
+    expect(domainAllowed({}, 'i2d.info')).toBe(false);
   });
 });
 
 describe('Ergebnisse', () => {
   it('enthält Folien, Antworten und Rangliste', () => {
-    const deck = { id: 'd', title: 'T', slides: [{ id: 's1', type: 'shortanswer', data: { question: 'Q', answers: ['Paris'], points: 100 } }] };
+    const dk = { id: 'd', title: 'T', slides: [{ id: 's1', type: 'shortanswer', data: { question: 'Q', answers: ['Paris'], points: 100 } }] };
     const all = { s1: [{ pid: 'p1', name: 'Lea', data: 'paris', at: 0 }] };
-    const r = buildResults(deck, all, { code: 'ABCDE', startedAt: 0, participants: 1, savedAt: 1000 });
+    const r = buildResults(dk, all, { code: 'ABCDE', startedAt: 0, participants: 1, savedAt: 1000 });
     expect(r.leaderboard).toEqual([{ name: 'Lea', pts: 100 }]);
     expect(r.slides[0].responses[0]).toMatchObject({ name: 'Lea', answer: 'paris' });
     expect(r.participants).toBe(1);
   });
-  it('Dateiname enthält Titel und Code', () => {
-    expect(resultsFileName('Mein Deck', 'XY12Z', new Date(2026, 10, 24, 18, 5).getTime())).toBe('2026-11-24 18.05 Mein Deck – Ergebnisse (XY12Z)');
+  it('Dateiname enthält Datum, Uhrzeit und Code (der Titel steht im Ordnernamen)', () => {
+    expect(resultsFileName('XY12Z', new Date(2026, 10, 24, 18, 5).getTime())).toBe('2026-11-24 18.05 Ergebnisse (XY12Z)');
   });
 });
