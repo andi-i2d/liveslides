@@ -154,12 +154,18 @@ async function inDeckFolder(env: DriveEnv, ids: IdMap, deck: { id: string; title
   }
 }
 
+/**
+ * Gemerkte Datei-IDs gelten nur zusammen mit dem Ordner, in dem die Datei liegt (Schlüssel enthält die Ordner-ID).
+ * So wird nie eine Datei an einem anderen Ort überschrieben, z. B. eine aus einer früheren Ablage-Struktur
+ * oder aus einem inzwischen gelöschten Ordner.
+ */
 export async function saveDeck(env: DriveEnv, ids: IdMap, deck: { id: string; title: string }) {
-  const key = `deck:${deck.id}`;
-  const id = await inDeckFolder(env, ids, deck, (folder) =>
-    upsertJson(env, { name: `${safe(deck.title)}.json`, folderId: folder, fileId: ids.get(key), json: deck, kind: 'deck' }));
-  ids.set(key, id);
-  return id;
+  return inDeckFolder(env, ids, deck, async (folder) => {
+    const key = `deckfile:${folder}`;
+    const id = await upsertJson(env, { name: `${safe(deck.title)}.json`, folderId: folder, fileId: ids.get(key), json: deck, kind: 'deck' });
+    ids.set(key, id);
+    return id;
+  });
 }
 
 export async function saveResults(
@@ -167,11 +173,12 @@ export async function saveResults(
   ids: IdMap,
   o: { deck: { id: string; title: string }; sessionId: string; name: string; json: unknown },
 ) {
-  const key = `res:${o.sessionId}`;
-  const id = await inDeckFolder(env, ids, o.deck, (folder) =>
-    upsertJson(env, { name: `${safe(o.name)}.json`, folderId: folder, fileId: ids.get(key), json: o.json, kind: 'results' }));
-  ids.set(key, id);
-  return id;
+  return inDeckFolder(env, ids, o.deck, async (folder) => {
+    const key = `resfile:${folder}:${o.sessionId}`;
+    const id = await upsertJson(env, { name: `${safe(o.name)}.json`, folderId: folder, fileId: ids.get(key), json: o.json, kind: 'results' });
+    ids.set(key, id);
+    return id;
+  });
 }
 
 export interface DriveFile { id: string; name: string; modifiedTime: string; folder?: string }

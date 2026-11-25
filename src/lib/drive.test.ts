@@ -177,6 +177,23 @@ describe('Drive: ein Unterordner je Präsentation', () => {
     expect(d.children(folders[0].id).map((f) => f.id)).toEqual([id]);
   });
 
+  it('gemerkte Datei-IDs aus der alten Ablage (andere Ordner) werden nicht überschrieben: die Datei entsteht im Präsentationsordner', async () => {
+    const d = fakeDrive({ preseed: ['SHARED123', 'OLD'] });
+    d.env.folderId = 'SHARED123';
+    // Zustand aus der Zeit vor den Unterordnern: das Gerät kennt eine Datei im alten Ordner unter dem alten Schlüssel
+    d.files.set('oldfile', { id: 'oldfile', name: 'Titel.json', mimeType: 'application/json', parents: ['OLD'], json: { alt: true }, modifiedTime: 'x' });
+    const ids = memMap();
+    ids.set('deck:a1', 'oldfile');
+    ids.set('res:s1', 'oldfile');
+    const id = await saveDeck(d.env, ids, deck('a1', 'Titel'));
+    const folder = d.children('SHARED123')[0];
+    expect(d.children(folder.id).map((f) => f.id)).toEqual([id]); // Datei liegt im Unterordner
+    expect(d.files.get('oldfile')!.json).toEqual({ alt: true }); // alte Datei bleibt unberührt
+    const rid = await saveResults(d.env, ids, { deck: deck('a1', 'Titel'), sessionId: 's1', name: 'Ergebnisse', json: { neu: 1 } });
+    expect(d.children(folder.id).map((f) => f.id)).toContain(rid);
+    expect(d.files.get('oldfile')!.json).toEqual({ alt: true });
+  });
+
   it('upsertJson legt neu an, wenn die alte Datei weg ist (404)', async () => {
     const d = fakeDrive({ preseed: ['F'] });
     const id = await upsertJson(d.env, { name: 'x.json', folderId: 'F', fileId: 'gone', json: {} });
