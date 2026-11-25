@@ -3,7 +3,7 @@ import type { Deck, Msg, Resp } from '../lib/types';
 import { openChannel, type Channel } from '../lib/realtime';
 import { types } from '../slides';
 import { uid } from '../lib/store';
-import { getLang, t, useLang } from '../lib/i18n';
+import { t, useLang } from '../lib/i18n';
 import { nameMode, resolveName } from '../lib/names';
 
 const store = {
@@ -37,6 +37,8 @@ export function Join({ code }: { code: string }) {
         setStep(m.step ?? 0);
       } else if (m.t === 'live') {
         setLive((l) => ({ ...l, [m.slideId]: m.responses }));
+      } else if (m.t === 'rename' && m.pid === pid.current) {
+        setName(m.name); // Präsentator hat den Namen eindeutig gemacht
       }
     });
     ch.current.send({ t: 'hello', pid: pid.current });
@@ -49,7 +51,6 @@ export function Join({ code }: { code: string }) {
   }, [code]);
 
   const mode = nameMode(deck); // bis die Präsentation bekannt ist, gilt die strengere Variante (Pflicht)
-  const guestLabel = getLang() === 'de' ? 'Gast' : 'Guest';
 
   if (name === null)
     return (
@@ -58,7 +59,7 @@ export function Join({ code }: { code: string }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            const n = resolveName(input, mode, pid.current, guestLabel);
+            const n = resolveName(input, mode, pid.current);
             if (!n) return;
             if (input.trim()) store.set('liveslides.name', n);
             setName(n);
@@ -73,7 +74,7 @@ export function Join({ code }: { code: string }) {
           />
           <button class="btn primary">{t('join.go')}</button>
           {mode === 'optional' && !input.trim() && (
-            <button type="button" class="btn" onClick={() => setName(resolveName('', 'optional', pid.current, guestLabel))}>
+            <button type="button" class="btn" onClick={() => setName(resolveName('', 'optional', pid.current))}>
               {t('join.skip')}
             </button>
           )}
@@ -93,6 +94,7 @@ export function Join({ code }: { code: string }) {
   };
   return (
     <div class="page narrow" role="main">
+      <p class="youare" aria-label={`${t('join.youAre')} ${name}`}>👤 {name}</p>
       {type.Player ? (
         <type.Player data={slide.data} submit={submit} mine={mine[slide.id] ?? []} live={live[slide.id] ?? []} pid={pid.current} step={step} />
       ) : (

@@ -5,6 +5,7 @@ import { openChannel, type Channel } from '../lib/realtime';
 import { types } from '../slides';
 import { Qr } from '../slides/static';
 import { createGuard } from '../lib/guard';
+import { createNameRegistry } from '../lib/names';
 import { t, useLang } from '../lib/i18n';
 import { cloudReady, cloudSaveResults, useCloudStatus } from '../lib/cloud';
 import { hasAnyResponse } from '../lib/results';
@@ -29,6 +30,7 @@ export function Presenter({ id }: { id: string }) {
   const ch = useRef<Channel | undefined>(undefined);
   const seen = useRef(new Set<string>());
   const guard = useRef(createGuard());
+  const names = useRef(createNameRegistry());
   const stateRef = useRef({ index, step });
   stateRef.current.index = index;
   stateRef.current.step = step;
@@ -44,8 +46,12 @@ export function Presenter({ id }: { id: string }) {
         send();
       } else if (m.t === 'resp') {
         const slide = deck.slides.find((s) => s.id === m.slideId);
-        const resp = slide && guard.current.accept(m.slideId, m.resp);
-        if (!slide || !resp) return;
+        const accepted = slide && guard.current.accept(m.slideId, m.resp);
+        if (!slide || !accepted) return;
+        // Namen eindeutig halten („Lustiger Luchs“ → „Lustiger Luchs 2“) und der Person den neuen Namen mitteilen
+        const finalName = names.current.assign(accepted.pid, accepted.name);
+        if (finalName !== accepted.name) ch.current?.send({ t: 'rename', pid: accepted.pid, name: finalName });
+        const resp = { ...accepted, name: finalName };
         seen.current.add(resp.pid);
         setPlayers(seen.current.size);
         const multi = types[slide.type].multi;

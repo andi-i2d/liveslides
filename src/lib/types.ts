@@ -77,4 +77,6 @@ export type Msg =
   | { t: 'hello'; pid: string }
   | { t: 'state'; deck: Deck; index: number; step?: number; code: string }
   | { t: 'resp'; slideId: string; resp: Resp }
-  | { t: 'live'; slideId: string; responses: Resp[] };
+  | { t: 'live'; slideId: string; responses: Resp[] }
+  /** Präsentator hat einen Anzeigenamen eindeutig gemacht (z. B. „Lustiger Luchs 2“) */
+  | { t: 'rename'; pid: string; name: string };

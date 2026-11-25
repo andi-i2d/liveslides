@@ -98,17 +98,48 @@ test('Name Pflicht: ohne Namen geht es nicht weiter, kein „Ohne Namen“-Knopf
   await ctx.close();
 });
 
-test('Name optional: ohne Namen mitmachen ergibt „Gast …“ in der Rangliste', async ({ browser }) => {
+// „Lustiger Luchs“: zwei Wörter mit demselben Anfangsbuchstaben (optional mit Nummer), danach die Punkte
+const FUNNY = /^(\p{L})\S* \1\S*( \d+)?1000$/u;
+
+test('Name optional: ohne Namen mitmachen ergibt einen lustigen Zufallsnamen (Doppelname, gleicher Anfangsbuchstabe)', async ({ browser }) => {
   const ctx = await browser.newContext({ locale: 'de-DE' });
   const { pres, code } = await startPresenter(ctx, quizSlides(), { names: 'optional' });
   const phone = await ctx.newPage();
   await phone.goto(`/#/join/${code}`);
   await phone.getByRole('button', { name: 'Ohne Namen mitmachen' }).click(); // erscheint, sobald die Einstellung bekannt ist
+  const youAre = (await phone.locator('.youare').innerText()).replace('👤', '').trim();
+  expect(youAre).toMatch(/^(\p{L})\S* \1\S*$/u); // z. B. „Lustiger Luchs“
   await phone.getByRole('textbox').fill('paris');
   await phone.getByRole('button', { name: 'Absenden' }).click();
   await expect(pres.getByText('1 Antwort(en)')).toBeVisible();
   await pres.getByRole('button', { name: 'Nächste Folie' }).click();
-  await expect(pres.locator('.lb li')).toContainText([/^Gast [A-Z0-9]{1,3}1000$/]);
+  await expect(pres.locator('.lb li')).toHaveText([FUNNY]);
+  expect((await pres.locator('.lb li span').innerText()).trim()).toBe(youAre); // Beamer zeigt denselben Namen wie das Handy
+  await ctx.close();
+});
+
+test('Zwei Personen mit demselben Namen werden unterscheidbar („Anna“ und „Anna 2“)', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { pres, code } = await startPresenter(ctx, quizSlides());
+  const join = async (pid: string) => {
+    const p = await ctx.newPage();
+    await p.addInitScript((id) => localStorage.setItem('liveslides.pid', id), pid); // eigene Geräte-ID je Handy
+    await p.goto(`/#/join/${code}`);
+    await p.getByPlaceholder('Dein Name').fill('Anna');
+    await p.getByRole('button', { name: 'Los!' }).click();
+    await p.getByRole('textbox').fill('paris');
+    await p.getByRole('button', { name: 'Absenden' }).click();
+    return p;
+  };
+  const a = await join('pid-aaa');
+  await expect(pres.getByText('1 Antwort(en)')).toBeVisible();
+  const b = await join('pid-bbb');
+  await expect(pres.getByText('2 Antwort(en)')).toBeVisible();
+  await expect(b.locator('.youare')).toContainText('Anna 2'); // Handy erfährt den eindeutigen Namen
+  await expect(a.locator('.youare')).not.toContainText('Anna 2');
+  await pres.getByRole('button', { name: 'Nächste Folie' }).click();
+  await expect(pres.locator('.lb li')).toHaveCount(2);
+  expect((await pres.locator('.lb li span').allInnerTexts()).map((s) => s.trim()).sort()).toEqual(['Anna', 'Anna 2']);
   await ctx.close();
 });
 

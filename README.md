@@ -24,7 +24,7 @@ Ohne Supabase läuft ein Testmodus (BroadcastChannel): Präsentator-Tab und Teil
 ## Bedienung
 - Präsentieren: Pfeiltasten/Leertaste blättern, **R** löst Quizfragen auf, **N** schaltet Etappen weiter
   (Turnier, Team-Retro), **F** Vollbild. Teilnehmer treten über QR-Code oder Code bei.
-- **Namen der Teilnehmer** (Editor → rechts, pro Präsentation): *Name ist Pflicht* (Standard) oder *Name ist optional*. Optional heißt: Teilnehmer können einen Namen eingeben oder ohne Namen mitmachen und erscheinen dann als „Gast K4M“ (stabil pro Gerät, auch in Ranglisten und Ergebnisdateien). Die Einstellung reist mit der Präsentation zu den Handys.
+- **Namen der Teilnehmer** (Editor → rechts, pro Präsentation): *Name ist Pflicht* (Standard) oder *Name ist optional*. Optional heißt: Teilnehmer können einen Namen eingeben oder ohne Namen mitmachen und bekommen dann einen lustigen Zufallsnamen aus dem Ideen-/Denk-/Innovationsbereich, z. B. „Dreister Denker“ oder „Lustiger Luchs“ (Adjektiv und Nomen mit gleichem Anfangsbuchstaben, 699 Kombinationen, pro Gerät stabil). Gleiche Namen werden automatisch unterscheidbar gemacht („Anna“, „Anna 2“); das Handy zeigt oben „👤 Name“. Die Wortliste steht in `src/lib/namewords.ts` und lässt sich dort erweitern; ein Test prüft Buchstaben, Länge und eine Liste unerwünschter Wörter.
 - Decks liegen im Browser (localStorage). Über JSON exportieren/importieren, um sie zu sichern oder zu teilen.
 - Sprache der Oberfläche: Deutsch/Englisch (Auswahl auf der Startseite). Folieninhalte sind frei wählbar.
 - Offline: Nach dem ersten Laden funktionieren Editor und Präsentation ohne Netz (Service Worker);
