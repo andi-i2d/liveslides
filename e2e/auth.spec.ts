@@ -105,9 +105,18 @@ test('Editor sichert Änderungen als Deck-Datei in Drive', async ({ context, pag
     localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'ed', title: 'Alt', slides: [
       { id: 's1', type: 'title', data: { title: 'Hallo', subtitle: 'x' } } ] }])),
   );
+  // Diagnose: schlägt das Warten fehl, steht im Fehlertext, was die Seite zeigte und welche Fehler es gab
+  const problems: string[] = [];
+  page.on('pageerror', (e) => problems.push(`pageerror: ${e}`));
+  page.on('console', (m) => m.type() === 'error' && problems.push(`console: ${m.text()}`));
   await page.goto('/#/edit/ed');
   await page.reload();
-  await page.getByLabel('Titel der Präsentation').fill('Neuer Titel');
+  const title = page.getByLabel('Titel der Präsentation');
+  await title.waitFor({ timeout: 15_000 }).catch(async (e) => {
+    const body = (await page.locator('body').innerText().catch(() => '?')).replace(/\s+/g, ' ').slice(0, 300);
+    throw new Error(`Editor nicht sichtbar. URL=${page.url()} Seite="${body}" Fehler=[${problems.join(' | ')}] (${e.message.split('\n')[0]})`);
+  });
+  await title.fill('Neuer Titel');
   await expect.poll(() => drive.uploads.some((u) => u.body.includes('Neuer Titel.json')), { timeout: 10_000 }).toBe(true);
   expect(drive.folders).toEqual(['LiveSlides', 'Präsentationen']);
 });
