@@ -4,7 +4,7 @@ Interaktive Präsentationen im Stil von AhaSlides, statisch auf GitHub Pages geh
 (https://andi-i2d.github.io/liveslides/). Stack: Vite + TypeScript + Preact.
 Live-Teilnahme per Handy über Supabase Realtime (Broadcast), 63 Folientypen.
 
-Design: angelehnt an www.i2d.info (heller Grund, Schrift Lato, Akzent Orange #fc6933). Farben stehen als CSS-Variablen in src/styles.css, die Diagrammfarben in den Paletten der Folien (src/slides/*.tsx). Die Schrift ist selbst gehostet (@fontsource/lato), es gibt keine Anfragen an Google Fonts.
+Design: angelehnt an www.i2d.info (heller Grund, Schrift Lato, Akzent Orange #fc6933). Farben stehen als CSS-Variablen in src/styles.css, die Diagrammfarben in den Paletten der Folien (src/slides/*.tsx). Die Schrift ist selbst gehostet (@fontsource/lato), es gibt keine Anfragen an Google Fonts. Logo und Briefkopf-Banner von Innovation2Didactics liegen in src/assets/ (i2d-logo.svg aus dem bereitgestellten SVG von Inkscape-Metadaten bereinigt, i2d-banner.jpg aus dem Briefkopf auf 1800 px verkleinert, 95 KB) und werden in src/views/Brand.tsx verwendet; das Favicon ist public/favicon.svg.
 
 ## Entwickeln
 ```

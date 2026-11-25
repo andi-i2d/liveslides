@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
+import { Banner } from './Brand';
 import { ALLOWED_DOMAIN, authEnabled, useAuth } from '../lib/google';
 import { t, useLang } from '../lib/i18n';
 
@@ -13,8 +14,8 @@ export function AuthGate({ children, open }: { children: ComponentChildren; open
     return <div class="page narrow"><p role="status" class="hint">…</p></div>;
   return (
     <div class="page narrow login">
+      <Banner />
       <h1 class="brand"><b>L</b>ive<b>S</b>lides</h1>
-      <p class="brandsub">Innovation2Didactics</p>
       <h2>{t('auth.title')}</h2>
       <p>{t('auth.sub')}</p>
       {ALLOWED_DOMAIN && <p class="hint">{t('auth.domain')}{ALLOWED_DOMAIN}</p>}

@@ -6,6 +6,7 @@ import { uid } from '../lib/store';
 import { t, useLang } from '../lib/i18n';
 import { funnyName, resolveName } from '../lib/names';
 import { retryDelay } from '../lib/pacing';
+import { Logo } from './Brand';
 
 const store = {
   get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -64,7 +65,7 @@ export function Join({ code }: { code: string }) {
   if (name === null)
     return (
       <div class="page narrow">
-        <h2>{t('join.title')} {code}</h2>
+        <div class="row"><Logo size={40} /><h2 class="grow">{t('join.title')} {code}</h2></div>
         <form
           onSubmit={(e) => {
             e.preventDefault();

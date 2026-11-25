@@ -180,3 +180,8 @@ button.thumb { color:var(--fg); text-align:left; font:inherit; cursor:pointer; w
 .cloudline { font-size:.85rem; color:var(--muted); display:flex; flex-direction:column; gap:6px; }
 .youare { margin:0 0 .6em; color:var(--muted); font-size:.9rem; }
 .page label.btn { display:inline-block; margin:0; }
+/* i2d-Banner und Logo */
+.banner { width:100%; height:auto; display:block; border-radius:12px; margin:0 0 14px; }
+.logo { display:block; flex:none; }
+.row.head { margin-bottom:6px; }
+.editor a.row { text-decoration:none; font-weight:700; }

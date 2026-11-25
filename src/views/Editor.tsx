@@ -4,6 +4,7 @@ import { getDeck, saveDeck } from '../lib/store';
 import { createSlide, typeList, types } from '../slides';
 import { t as tr, useLang } from '../lib/i18n';
 import { cloudReady, cloudSaveDeck, useCloudStatus } from '../lib/cloud';
+import { Logo } from './Brand';
 
 function FieldInput({ f, value, onChange }: { f: Field; value: any; onChange: (v: any) => void }) {
   if (f.kind === 'textarea')
@@ -58,7 +59,7 @@ export function Editor({ id }: { id: string }) {
   return (
     <div class="editor">
       <aside class="slides">
-        <a href="#/">{tr('editor.back')}</a>
+        <a class="row" href="#/"><Logo size={26} /> {tr('editor.back')}</a>
         {deck.slides.map((s, i) => (
           <button class={'thumb' + (i === sel ? ' on' : '')} aria-current={i === sel} onClick={() => setSel(i)}>
             {i + 1}. {types[s.type].icon} {types[s.type].label}

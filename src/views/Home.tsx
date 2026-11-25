@@ -3,6 +3,7 @@ import { deleteDeck, loadDecks, newDeck, saveDeck, uid } from '../lib/store';
 import { hasBackend } from '../lib/realtime';
 import { setLang, t, useLang } from '../lib/i18n';
 import { types } from '../slides';
+import { Banner } from './Brand';
 import { useAuth } from '../lib/google';
 import { cloudListDecks, cloudLoadDeck } from '../lib/cloud';
 import type { DriveFile } from '../lib/drive';
@@ -83,8 +84,9 @@ export function Home() {
   };
   return (
     <div class="page">
-      <div class="row">
-        <div class="grow"><h1 class="brand"><b>L</b>ive<b>S</b>lides</h1><p class="brandsub">Innovation2Didactics</p></div>
+      <Banner />
+      <div class="row head">
+        <h1 class="brand grow"><b>L</b>ive<b>S</b>lides</h1>
         {auth.user && (
           <span class="userchip">
             {auth.user.picture && <img src={auth.user.picture} alt="" referrerpolicy="no-referrer" />}
