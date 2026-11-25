@@ -26,9 +26,10 @@ test.describe('Folienauswahl: präsentierend und interaktiv', () => {
     await expect(dialog.getByRole('button', { name: /^📊 Umfrage/ })).toHaveCount(0);
     await expect(dialog.getByRole('heading', { name: 'Werkzeuge' })).toBeVisible(); // Glücksrad, Timer …
     await expect(dialog.getByRole('button', { name: /Glücksrad/ })).toBeVisible();
-    // Interaktiv: Umfrage, Quiz, Foto-Drop; kein Zitat
+    // Interaktiv: Umfrage, Quiz, Foto teilen; kein Zitat
     await dialog.getByRole('tab', { name: /Interaktiv/ }).click();
-    await expect(dialog.getByRole('button', { name: /Foto-Drop/ })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Foto teilen/ })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Foto-Drop/ })).toHaveCount(0); // zusammengelegt
     await expect(dialog.getByRole('button', { name: /Zitat/ })).toHaveCount(0);
     await expect(dialog.getByRole('heading', { name: 'Quiz' })).toBeVisible();
     await dialog.getByRole('button', { name: /^📊 Umfrage/ }).click();
@@ -97,8 +98,8 @@ test.describe('Teilnehmeransicht (Vorschau) im Editor', () => {
     await expect(page.locator('.phone')).toHaveCount(0);
   });
 
-  test('Foto-Drop-Folie: Vorschau zeigt Datei-Auswahl und den Datenschutz-Hinweis', async ({ page }) => {
-    await openEditor(page, [{ id: 's3', type: 'photodrop', data: { question: 'Teilt Fotos', max: 2, gallery: 'yes' } }]);
+  test('Foto-teilen-Folie: Vorschau zeigt Datei-Auswahl und den Datenschutz-Hinweis', async ({ page }) => {
+    await openEditor(page, [{ id: 's3', type: 'photoshare', data: { question: 'Teilt Fotos', max: 2, gallery: 'yes' } }]);
     await page.getByRole('button', { name: '📱 Teilnehmeransicht' }).click();
     const phone = page.locator('.phone');
     await expect(phone.locator('input[type=file]')).toBeVisible();

@@ -74,7 +74,7 @@ describe('Bilder im Deck und auf den Handys', () => {
   });
 
   it('Antworten mit Fotos oder Zeichnungen landen ohne Bilddaten in der Ergebnisdatei', () => {
-    const deck = { id: 'd', title: 'T', slides: [{ ...createSlide('photodrop') }, { ...createSlide('drawanswer') }] };
+    const deck = { id: 'd', title: 'T', slides: [{ ...createSlide('photoshare') }, { ...createSlide('drawanswer') }] };
     const all = {
       [deck.slides[0].id]: [{ pid: 'p', name: 'Anna', at: 1, data: { img: PNG, cap: 'Gruppenfoto' } }],
       [deck.slides[1].id]: [{ pid: 'p', name: 'Anna', at: 2, data: PNG }],

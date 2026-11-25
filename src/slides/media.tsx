@@ -274,63 +274,12 @@ export const drawAnswer: SlideType = {
   ),
 };
 
-/** Foto verkleinern, damit es als kleine Antwort über den Realtime-Kanal passt. */
-export function shrinkImage(file: File, max = 360): Promise<string> {
-  return new Promise((res, rej) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      res(c.toDataURL('image/jpeg', 0.6));
-    };
-    img.onerror = () => rej(new Error('Bild nicht lesbar'));
-    img.src = url;
-  });
-}
-
-export const photoShare: SlideType = {
-  id: 'photoshare', label: 'Foto teilen', icon: '📷', category: 'Bild', interactive: true, multi: true,
-  defaults: () => ({ question: 'Zeigt uns euren Arbeitsplatz', max: 1 }),
-  fields: [
-    { key: 'question', label: 'Aufgabe', kind: 'text' },
-    { key: 'max', label: 'Fotos pro Person', kind: 'number' },
-  ],
-  Stage: ({ data, ctx }) => (
-    <div class="col">
-      <h2>{data.question}</h2>
-      <Gallery rs={ctx.responses} />
-    </div>
-  ),
-  Player: ({ data, submit, mine }) => {
-    const [img, setImg] = useState('');
-    const [cap, setCap] = useState('');
-    const left = Number(data.max) - mine.length;
-    return (
-      <>
-        <h3>{data.question}</h3>
-        {left > 0 ? (
-          <>
-            <input type="file" accept="image/*" onChange={async (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) setImg(await shrinkImage(f)); }} />
-            {img && <img class="preview" src={img} alt="" />}
-            <input placeholder="Bildunterschrift (optional)" maxLength={60} value={cap} onInput={(e) => setCap(inputVal(e))} />
-            <button class="btn primary" disabled={!img} onClick={() => { submit({ img, cap }); setImg(''); setCap(''); }}>Senden</button>
-          </>
-        ) : <p class="hint">✓ Foto gesendet</p>}
-      </>
-    );
-  },
-};
-
 /**
- * Foto-Drop: Teilnehmende senden Fotos (bis ca. 1280 px, max. 180 KB), der Präsentator-Browser legt sie automatisch im
+ * Foto teilen: Teilnehmende senden Fotos (bis ca. 1280 px, max. 180 KB), der Präsentator-Browser legt sie automatisch im
  * Ordner Fotos der Präsentation in Drive ab (Angemeldet sein ist nötig, sonst werden sie nur gezeigt).
  */
-export const photoDrop: SlideType = {
-  id: 'photodrop', label: 'Foto-Drop (landet in Drive)', icon: '📥', category: 'Bild', interactive: true, multi: true, driveDrop: true,
+export const photoShare: SlideType = {
+  id: 'photoshare', label: 'Foto teilen (landet in Drive)', icon: '📷', category: 'Bild', interactive: true, multi: true, driveDrop: true,
   defaults: () => ({ question: 'Teilt eure Fotos mit uns', max: 5, gallery: 'yes' }),
   fields: [
     { key: 'question', label: 'Aufgabe', kind: 'text' },

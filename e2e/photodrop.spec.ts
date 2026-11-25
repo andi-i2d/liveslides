@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { PNG, fakeGoogle, signIn } from './fakes';
 
-// Foto-Drop: Handy → Beamer-Seite (Präsentator, angemeldet) → Drive. Port 5198 (Google-Anmeldung wird simuliert).
+// Foto teilen (landet in Drive): Handy → Beamer-Seite (Präsentator, angemeldet) → Drive. Port 5198 (Google-Anmeldung wird simuliert).
 test.use({ baseURL: 'http://localhost:5198', locale: 'de-DE' });
 
 const dropDeck = (extra: unknown[] = []) => [{ id: 'fd', title: 'Foto Test', slides: [
-  { id: 's1', type: 'photodrop', data: { question: 'Teilt eure Fotos', max: 2, gallery: 'yes' } },
+  { id: 's1', type: 'photoshare', data: { question: 'Teilt eure Fotos', max: 2, gallery: 'yes' } },
   ...extra,
 ] }];
 
@@ -52,15 +52,36 @@ test('Foto vom Handy erscheint auf dem Beamer und landet automatisch in Drive/Fo
   expect(drive.uploads.filter((u) => u.body.includes('"liveslides":"photo"'))[1].body).toMatch(/ Mia 2\.jpg"/);
 });
 
-test('„Foto teilen“ legt nichts in Drive ab (nur Foto-Drop)', async ({ context, page }) => {
+test('Der Dateiname enthält den Einsendernamen, auch den Zufallsnamen, wenn der Vorschlag unverändert bleibt', async ({ context, page }) => {
+  const drive = await fakeGoogle(context, 'anna@i2d.test');
+  await signIn(page);
+  await page.evaluate((d) => localStorage.setItem('liveslides.decks', JSON.stringify(d)), dropDeck());
+  await page.goto('/#/present/fd');
+  await page.reload();
+  const code = (await page.locator('.bar .code').innerText()).trim();
+  const phone = await context.newPage();
+  await phone.goto(`/#/join/${code}`);
+  await phone.getByRole('button', { name: 'Los!' }).click(); // Namensvorschlag (z. B. Dreister Denker) unverändert übernehmen
+  const name = (await phone.locator('.youare').innerText()).replace('👤', '').trim();
+  expect(name).toMatch(/^(\p{L})\S* \1\S*$/u);
+  await phone.locator('input[type=file]').setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: PNG });
+  await expect(phone.locator('img.preview')).toBeVisible();
+  await phone.getByRole('button', { name: 'Senden' }).click();
+  await expect.poll(() => drive.uploads.some((u) => u.body.includes('"liveslides":"photo"')), { timeout: 10_000 }).toBe(true);
+  const body = drive.uploads.find((u) => u.body.includes('"liveslides":"photo"'))!.body;
+  expect(body).toContain(` ${name} 1.jpg"`); // Datum, Uhrzeit, Einsendername, Nummer
+});
+
+test('Der frühere Typname photodrop (Foto-Drop) läuft weiter und wird ebenfalls in Drive gespeichert', async ({ context, page }) => {
   const drive = await fakeGoogle(context, 'anna@i2d.test');
   await signIn(page);
   await page.evaluate(() =>
-    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'fs', title: 'Nur Teilen', slides: [
-      { id: 's1', type: 'photoshare', data: { question: 'Zeigt uns etwas', max: 1 } } ] }])),
+    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'old', title: 'Alt', slides: [
+      { id: 's1', type: 'photodrop', data: { question: 'Alte Folie', max: 1, gallery: 'yes' } } ] }])),
   );
-  await page.goto('/#/present/fs');
+  await page.goto('/#/present/old');
   await page.reload();
+  await expect(page.getByText('Alte Folie')).toBeVisible();
   const code = (await page.locator('.bar .code').innerText()).trim();
   const phone = await context.newPage();
   await phone.goto(`/#/join/${code}`);
@@ -69,9 +90,8 @@ test('„Foto teilen“ legt nichts in Drive ab (nur Foto-Drop)', async ({ conte
   await phone.locator('input[type=file]').setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: PNG });
   await expect(phone.locator('img.preview')).toBeVisible();
   await phone.getByRole('button', { name: 'Senden' }).click();
-  await expect(page.locator('.gallery img')).toHaveCount(1); // auf dem Beamer
-  await page.waitForTimeout(1500);
-  expect(drive.uploads.filter((u) => u.body.includes('"liveslides":"photo"'))).toHaveLength(0);
+  await expect.poll(() => drive.uploads.some((u) => u.body.includes('"liveslides":"photo"')), { timeout: 10_000 }).toBe(true);
+  expect(drive.folders).toEqual(['LiveSlides', 'Alt', 'Fotos']);
 });
 
 test('Datei, die kein Bild ist: verständliche Fehlermeldung, nichts wird gesendet', async ({ context, page }) => {

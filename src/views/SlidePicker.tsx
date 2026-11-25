@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import { typeList } from '../slides';
 import { grouped, type Mode } from '../slides/groups';
 import { t, useLang } from '../lib/i18n';
@@ -13,7 +13,8 @@ export function SlidePicker({ onPick }: { onPick: (typeId: string) => void }) {
   const [mode, setMode] = useState<Mode>('present');
   const groups = useMemo(() => grouped(typeList), []);
 
-  useEffect(() => {
+  // useLayoutEffect: der Escape-Handler hängt schon, bevor der Browser das Fenster zeichnet (kein Zeitfenster, in dem Escape wirkungslos wäre)
+  useLayoutEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     addEventListener('keydown', k);

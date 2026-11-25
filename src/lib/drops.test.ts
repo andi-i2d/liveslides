@@ -32,21 +32,22 @@ describe('Foto-Drop: welche Fotos noch gespeichert werden müssen', () => {
   const deck = {
     id: 'd', title: 'T',
     slides: [
-      { id: 'drop', type: 'photodrop', data: {} },
-      { id: 'share', type: 'photoshare', data: {} }, // „Foto teilen“ wird NICHT in Drive abgelegt
+      { id: 'drop', type: 'photodrop', data: {} }, // früherer Typname (Alias von Foto teilen)
+      { id: 'share', type: 'photoshare', data: {} },
       { id: 'poll', type: 'poll', data: {} },
     ],
   };
 
-  it('nur Folien mit Foto-Drop, nur Fotos, nur noch nicht gespeicherte, in Eingangsreihenfolge', () => {
+  it('nur Foto-Folien (auch unter dem früheren Namen), nur Fotos, nur noch nicht gespeicherte, in Eingangsreihenfolge', () => {
     const all = {
       drop: [resp('b', 30, { img: JPG }), resp('a', 10, { img: JPG, cap: 'Hi' }), resp('c', 20, { img: 'https://x/y.jpg' })],
-      share: [resp('a', 5, { img: JPG })],
+      share: [resp('d', 5, { img: JPG })],
       poll: [resp('a', 1, 0)],
     };
     const p = pendingDrops(deck, all, new Set(), types);
-    expect(p.map((x) => x.key)).toEqual(['drop:a:10', 'drop:b:30']);
-    expect(pendingDrops(deck, all, new Set(['drop:a:10']), types).map((x) => x.key)).toEqual(['drop:b:30']);
+    expect(p.map((x) => x.key)).toEqual(['share:d:5', 'drop:a:10', 'drop:b:30']); // Foto teilen UND der frühere Name; Umfrage nie
+    expect(pendingDrops(deck, all, new Set(['drop:a:10']), types).map((x) => x.key)).toEqual(['share:d:5', 'drop:b:30']);
+    expect(pendingDrops(deck, all, new Set(['drop:a:10', 'share:d:5']), types).map((x) => x.key)).toEqual(['drop:b:30']);
     expect(pendingDrops(deck, {}, new Set(), types)).toEqual([]);
   });
   it('dieselbe Person kann mehrere Fotos senden (Schlüssel enthält den Zeitpunkt)', () => {

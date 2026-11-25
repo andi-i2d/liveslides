@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { typeList } from '.';
+import { typeList, types } from '.';
 import { grouped, groupOf, modeOf } from './groups';
 
 describe('Folienauswahl: präsentierend und interaktiv', () => {
@@ -28,6 +28,15 @@ describe('Folienauswahl: präsentierend und interaktiv', () => {
     expect(g.present.map((x) => x.name)).toEqual(expect.arrayContaining(['Inhalt', 'Werkzeuge', 'Auswertung']));
     expect(g.interactive.map((x) => x.name)).toEqual(expect.arrayContaining(['Umfrage', 'Quiz', 'Bild', 'Spiel']));
     expect(g.interactive.map((x) => x.name)).not.toContain('Werkzeuge');
+  });
+
+  it('Foto teilen gibt es nur einmal in der Auswahl; der frühere Name photodrop läuft als Alias weiter', () => {
+    const ids = typeList.map((t) => t.id);
+    expect(ids).toContain('photoshare');
+    expect(ids).not.toContain('photodrop');
+    expect(types.photodrop).toBe(types.photoshare); // alte Präsentationen funktionieren weiter
+    expect(types.photoshare.driveDrop).toBe(true); // Fotos landen immer in Drive
+    expect(typeList.filter((t) => t.label.includes('Foto')).map((t) => t.id)).toEqual(['photoshare']);
   });
 
   it('Rangliste und Glücksrad sind präsentierend und heißen nicht Quiz/Spiel', () => {

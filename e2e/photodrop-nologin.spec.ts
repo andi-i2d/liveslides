@@ -8,12 +8,12 @@ test('Ohne Anmeldung warnt der Präsentator, dass Fotos nicht in Drive gespeiche
   await pres.evaluate(() => {
     localStorage.setItem('liveslides.lang', 'de');
     localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'fd', title: 'T', slides: [
-      { id: 's1', type: 'photodrop', data: { question: 'Fotos?', max: 1, gallery: 'yes' } },
+      { id: 's1', type: 'photoshare', data: { question: 'Fotos?', max: 1, gallery: 'yes' } },
       { id: 's2', type: 'title', data: { title: 'Ende', subtitle: '' } },
     ] }]));
   });
   await pres.goto('/#/present/fd');
-  await expect(pres.getByText('Foto-Drop: nicht angemeldet, Fotos werden nicht in Drive gespeichert')).toBeVisible();
+  await expect(pres.getByText('nicht angemeldet, Fotos werden nicht in Drive gespeichert')).toBeVisible();
   await pres.keyboard.press('ArrowRight'); // andere Folie: keine Warnung
   await expect(pres.getByText('nicht angemeldet')).toHaveCount(0);
   await ctx.close();
