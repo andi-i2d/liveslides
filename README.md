@@ -4,6 +4,8 @@ Interaktive Präsentationen im Stil von AhaSlides, statisch auf GitHub Pages geh
 (https://andi-i2d.github.io/liveslides/). Stack: Vite + TypeScript + Preact.
 Live-Teilnahme per Handy über Supabase Realtime (Broadcast), 63 Folientypen.
 
+Design: angelehnt an www.i2d.info (heller Grund, Schrift Lato, Akzent Orange #fc6933). Farben stehen als CSS-Variablen in src/styles.css, die Diagrammfarben in den Paletten der Folien (src/slides/*.tsx). Die Schrift ist selbst gehostet (@fontsource/lato), es gibt keine Anfragen an Google Fonts.
+
 ## Entwickeln
 ```
 npm install
@@ -31,6 +33,8 @@ Ohne Supabase läuft ein Testmodus (BroadcastChannel): Präsentator-Tab und Teil
   Live-Teilnahme braucht Verbindung.
 
 ## Google-Anmeldung und Drive (optional)
+Status: Auf der Live-Seite aktiv für Konten @i2d.info (GitHub-Variablen VITE_GOOGLE_CLIENT_ID und VITE_ALLOWED_DOMAIN). Die Client-ID ist öffentlich; das heruntergeladene Client-Secret (client_secret_*.json) wird von der App nicht gebraucht und ist per .gitignore ausgeschlossen. Bitte außerhalb des Projektordners aufbewahren.
+
 Ist `VITE_GOOGLE_CLIENT_ID` gesetzt, müssen sich Organisatoren (Startseite, Editor, Präsentator) mit Google anmelden.
 Teilnehmer (`#/join/…`) brauchen **keine** Anmeldung. Angemeldete Nutzer bekommen:
 - **Decks in Drive:** Änderungen im Editor werden automatisch als `LiveSlides/Präsentationen/<Titel>.json` gesichert;

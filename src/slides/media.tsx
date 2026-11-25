@@ -2,7 +2,7 @@ import { useRef, useState } from 'preact/hooks';
 import type { Resp, SlideType } from '../lib/types';
 import { scoreMap, scorePin, scoreShort } from './grading';
 
-const COLORS = ['#7c5cff', '#27c47d', '#ffb020', '#ff5c7c', '#35b7ff', '#c06cff', '#9be34a', '#ff8a4c'];
+const COLORS = ['#fc6933', '#1e8e8e', '#2f6fb0', '#e8556d', '#4a9d5b', '#146c7a', '#c2541d', '#4f5d75'];
 const WORLD = 'https://upload.wikimedia.org/wikipedia/commons/8/83/Equirectangular_projection_SW.jpg';
 const inputVal = (e: Event) => (e.target as HTMLInputElement).value;
 
@@ -23,7 +23,7 @@ function PinImage({ src, dots, onPick, small }: { src: string; dots: Dot[]; onPi
       {dots.map((d) => (
         <span
           class={'pin' + (d.ring ? ' ring' : '')}
-          style={{ left: `${d.x * 100}%`, top: `${d.y * 100}%`, background: d.ring ? 'transparent' : d.color ?? '#ff5c7c' }}
+          style={{ left: `${d.x * 100}%`, top: `${d.y * 100}%`, background: d.ring ? 'transparent' : d.color ?? '#fc6933' }}
         >
           {d.label}
         </span>
@@ -36,7 +36,7 @@ const Submit = ({ mine, onClick, disabled }: { mine: Resp[]; onClick: () => void
   <button class="btn primary" disabled={disabled || mine.length > 0} onClick={onClick}>{mine.length ? '✓ Gesendet' : 'Absenden'}</button>
 );
 
-const pts = (rs: Resp[]) => rs.filter((r) => Array.isArray(r.data)).map((r) => ({ x: (r.data as number[])[0], y: (r.data as number[])[1], color: '#ff5c7cbb' }));
+const pts = (rs: Resp[]) => rs.filter((r) => Array.isArray(r.data)).map((r) => ({ x: (r.data as number[])[0], y: (r.data as number[])[1], color: '#fc6933bb' }));
 
 function PinPlayer({ data, submit, mine, title }: { data: any; submit: (d: any) => void; mine: Resp[]; title: string }) {
   const [p, setP] = useState<[number, number] | null>(null);
@@ -193,11 +193,11 @@ export const annotate: SlideType = {
           {data.image && <img src={data.image} alt="" />}
           <svg
             viewBox="0 0 1000 1000" preserveAspectRatio="none" class="over draw"
-            onPointerDown={(e) => { if (done) return; (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); cur.current = { c: '#ff5c7c', p: [rel(e)] }; setStrokes((s) => [...s, cur.current!]); }}
+            onPointerDown={(e) => { if (done) return; (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); cur.current = { c: '#fc6933', p: [rel(e)] }; setStrokes((s) => [...s, cur.current!]); }}
             onPointerMove={(e) => { if (!cur.current) return; cur.current.p.push(rel(e)); setStrokes((s) => [...s]); }}
             onPointerUp={() => (cur.current = null)}
           >
-            {strokes.map((s) => <path d={strokePath(s)} stroke="#ff5c7c" fill="none" stroke-width="5" stroke-linecap="round" />)}
+            {strokes.map((s) => <path d={strokePath(s)} stroke="#fc6933" fill="none" stroke-width="5" stroke-linecap="round" />)}
           </svg>
         </div>
         <button class="btn" disabled={done} onClick={() => setStrokes([])}>Löschen</button>{' '}

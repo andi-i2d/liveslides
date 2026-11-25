@@ -84,7 +84,7 @@ export function Home() {
   return (
     <div class="page">
       <div class="row">
-        <h1 class="grow">LiveSlides</h1>
+        <div class="grow"><h1 class="brand"><b>L</b>ive<b>S</b>lides</h1><p class="brandsub">Innovation2Didactics</p></div>
         {auth.user && (
           <span class="userchip">
             {auth.user.picture && <img src={auth.user.picture} alt="" referrerpolicy="no-referrer" />}

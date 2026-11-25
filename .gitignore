@@ -3,3 +3,8 @@ dist
 .env.local
 test-results
 playwright-report
+
+# Google OAuth Client-Secret (Download aus der Cloud Console). Gehoert NIE ins Repo; die App braucht es nicht.
+client_secret*.json
+client_secrets*.json
+*.apps.googleusercontent.com.json

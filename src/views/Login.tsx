@@ -13,7 +13,8 @@ export function AuthGate({ children, open }: { children: ComponentChildren; open
     return <div class="page narrow"><p role="status" class="hint">…</p></div>;
   return (
     <div class="page narrow login">
-      <h1>LiveSlides</h1>
+      <h1 class="brand"><b>L</b>ive<b>S</b>lides</h1>
+      <p class="brandsub">Innovation2Didactics</p>
       <h2>{t('auth.title')}</h2>
       <p>{t('auth.sub')}</p>
       {ALLOWED_DOMAIN && <p class="hint">{t('auth.domain')}{ALLOWED_DOMAIN}</p>}

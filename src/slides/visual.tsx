@@ -1,6 +1,6 @@
 import type { SlideType } from '../lib/types';
 
-const PALETTE = ['#7c5cff', '#27c47d', '#ffb020', '#ff5c7c', '#35b7ff', '#c06cff', '#9be34a', '#ff8a4c'];
+const PALETTE = ['#fc6933', '#1e8e8e', '#2f6fb0', '#e8556d', '#4a9d5b', '#146c7a', '#c2541d', '#4f5d75'];
 
 /** Zeilen "Label; Zahl" → Datenpunkte. Ungültige Zeilen werden ignoriert. */
 export function parsePairs(lines: string[]) {
@@ -257,11 +257,11 @@ export function ChartSvg({ kind, rows }: { kind: string; rows: { label: string; 
           a0 = a1;
           return <path d={d} fill={PALETTE[i % PALETTE.length]} />;
         })}
-        {kind === 'donut' && <circle cx={cx} cy={cy} r={90} fill="#12163a" />}
+        {kind === 'donut' && <circle cx={cx} cy={cy} r={90} fill="#ffffff" />}
         {rows.map((row, i) => (
           <g transform={`translate(430, ${40 + i * 38})`}>
             <rect width="22" height="22" rx="4" fill={PALETTE[i % PALETTE.length]} />
-            <text x="34" y="18" fill="#f4f5ff" font-size="22">
+            <text x="34" y="18" fill="#212121" font-size="22">
               {row.label} – {Math.round((row.value / total) * 100)} %
             </text>
           </g>
@@ -274,7 +274,7 @@ export function ChartSvg({ kind, rows }: { kind: string; rows: { label: string; 
   const y = (v: number) => H - pad - (v / max) * (H - pad * 2);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} class="chart">
-      <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#555a88" />
+      <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#bdbdbd" />
       {kind === 'line' && (
         <polyline
           fill="none"
@@ -292,10 +292,10 @@ export function ChartSvg({ kind, rows }: { kind: string; rows: { label: string; 
             ) : (
               <rect x={x + bw * 0.15} y={y(r.value)} width={bw * 0.7} height={H - pad - y(r.value)} rx="6" fill={PALETTE[i % PALETTE.length]} />
             )}
-            <text x={x + bw / 2} y={y(r.value) - 10} text-anchor="middle" fill="#f4f5ff" font-size="20">
+            <text x={x + bw / 2} y={y(r.value) - 10} text-anchor="middle" fill="#212121" font-size="20">
               {r.value}
             </text>
-            <text x={x + bw / 2} y={H - 18} text-anchor="middle" fill="#9aa0c8" font-size="18">
+            <text x={x + bw / 2} y={H - 18} text-anchor="middle" fill="#5f6368" font-size="18">
               {r.label}
             </text>
           </g>

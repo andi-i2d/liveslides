@@ -4,7 +4,7 @@ import { Bars, Choice, tally } from './interactive';
 import { avgVectors, ideasWithVotes, merge, rankScores } from './ideas';
 
 const clean = (a: string[]) => a.filter((s) => s.trim());
-const COLORS = ['#7c5cff', '#27c47d', '#ffb020', '#ff5c7c', '#35b7ff', '#c06cff', '#9be34a', '#ff8a4c'];
+const COLORS = ['#fc6933', '#1e8e8e', '#2f6fb0', '#e8556d', '#4a9d5b', '#146c7a', '#c2541d', '#4f5d75'];
 
 export const emoji: SlideType = {
   id: 'emoji',
@@ -191,15 +191,15 @@ export const matrix: SlideType = {
       <div class="col">
         <h2>{data.title}</h2>
         <svg viewBox="0 0 500 360" class="chart">
-          <rect x="40" y="10" width="440" height="310" fill="#0f1226" rx="8" />
-          <line x1="260" y1="10" x2="260" y2="320" stroke="#555a88" />
-          <line x1="40" y1="165" x2="480" y2="165" stroke="#555a88" />
-          <text x="260" y="350" text-anchor="middle" fill="#9aa0c8" font-size="16">{data.xLabel} →</text>
-          <text x="14" y="165" text-anchor="middle" fill="#9aa0c8" font-size="16" transform="rotate(-90 14 165)">{data.yLabel} →</text>
+          <rect x="40" y="10" width="440" height="310" fill="#f4f4f4" rx="8" />
+          <line x1="260" y1="10" x2="260" y2="320" stroke="#bdbdbd" />
+          <line x1="40" y1="165" x2="480" y2="165" stroke="#bdbdbd" />
+          <text x="260" y="350" text-anchor="middle" fill="#5f6368" font-size="16">{data.xLabel} →</text>
+          <text x="14" y="165" text-anchor="middle" fill="#5f6368" font-size="16" transform="rotate(-90 14 165)">{data.yLabel} →</text>
           {items.map((t, i) => (
             <g>
               <circle cx={40 + (xy[i][0] / 100) * 440} cy={320 - (xy[i][1] / 100) * 310} r="9" fill={COLORS[i % 8]} />
-              <text x={50 + (xy[i][0] / 100) * 440} y={316 - (xy[i][1] / 100) * 310} fill="#f4f5ff" font-size="15">{t}</text>
+              <text x={50 + (xy[i][0] / 100) * 440} y={316 - (xy[i][1] / 100) * 310} fill="#212121" font-size="15">{t}</text>
             </g>
           ))}
         </svg>
@@ -251,12 +251,12 @@ export const radar: SlideType = {
         <h2>{data.question}</h2>
         <svg viewBox="0 0 500 400" class="chart">
           {[0.25, 0.5, 0.75, 1].map((f) => (
-            <polygon points={c.map((_, i) => pt(i, f)).join(' ')} fill="none" stroke="#555a88" />
+            <polygon points={c.map((_, i) => pt(i, f)).join(' ')} fill="none" stroke="#bdbdbd" />
           ))}
-          <polygon points={avg.map((v, i) => pt(i, Math.min(1, v / data.max))).join(' ')} fill="#7c5cff88" stroke="#7c5cff" stroke-width="3" />
+          <polygon points={avg.map((v, i) => pt(i, Math.min(1, v / data.max))).join(' ')} fill="#fc693388" stroke="#fc6933" stroke-width="3" />
           {c.map((t, i) => {
             const [x, y] = pt(i, 1.15).split(',').map(Number);
-            return <text x={x} y={y} text-anchor="middle" fill="#f4f5ff" font-size="16">{t} ({avg[i].toFixed(1)})</text>;
+            return <text x={x} y={y} text-anchor="middle" fill="#212121" font-size="16">{t} ({avg[i].toFixed(1)})</text>;
           })}
         </svg>
       </div>

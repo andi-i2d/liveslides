@@ -1,5 +1,8 @@
 import { Component, render, type ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+import '@fontsource/lato/latin-300.css';
+import '@fontsource/lato/latin-400.css';
+import '@fontsource/lato/latin-700.css';
 import './styles.css';
 import { Home } from './views/Home';
 import { Editor } from './views/Editor';

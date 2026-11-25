@@ -10,7 +10,7 @@ import {
 import { quiz } from './quiz';
 import { types } from '.';
 
-const COLORS = ['#7c5cff', '#27c47d', '#ffb020', '#ff5c7c', '#35b7ff', '#c06cff', '#9be34a', '#ff8a4c'];
+const COLORS = ['#fc6933', '#1e8e8e', '#2f6fb0', '#e8556d', '#4a9d5b', '#146c7a', '#c2541d', '#4f5d75'];
 const clean = (a: string[]) => a.filter((s) => s.trim());
 const inputVal = (e: Event) => (e.target as HTMLInputElement).value;
 const uniq = (a: string[]) => [...new Set(a.map((s) => s.trim()).filter(Boolean))];
@@ -212,7 +212,7 @@ export const duckRace = race('duckrace', 'Entenrennen', '🦆', '🦆');
 export const halloweenRace = race('halloweenrace', 'Halloween-Rennen', '👻', '🎃');
 
 // ---------- Quiz-Spiele mit Blasen / Truhen ----------
-const BUBBLE = ['#7c5cff', '#27c47d', '#ffb020', '#ff5c7c', '#35b7ff', '#c06cff'];
+const BUBBLE = ['#fc6933', '#1e8e8e', '#2f6fb0', '#e8556d', '#4a9d5b', '#146c7a'];
 function Bubbles({ opts, onPick, disabled }: { opts: string[]; onPick: (i: number) => void; disabled?: boolean }) {
   return (
     <div class="bubbles">
@@ -442,7 +442,7 @@ export const mindmap: SlideType = {
       <div class="col" style={{ height: '100%' }}>
         <div class="mind">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-            {lines.map((l) => <line x1={pos.get(l.from)![0]} y1={pos.get(l.from)![1]} x2={pos.get(l.to)![0]} y2={pos.get(l.to)![1]} stroke="#555a88" stroke-width=".3" />)}
+            {lines.map((l) => <line x1={pos.get(l.from)![0]} y1={pos.get(l.from)![1]} x2={pos.get(l.to)![0]} y2={pos.get(l.to)![1]} stroke="#bdbdbd" stroke-width=".3" />)}
           </svg>
           <div class="mn root" style={{ left: '50%', top: '50%' }}>{data.topic}</div>
           {nodes.filter((n) => pos.has(n.key)).map((n, i) => (
