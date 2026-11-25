@@ -3,6 +3,7 @@ import { t, useLang } from '../lib/i18n';
 import { blobToDataUrl, dataUrlBytes, isDataUrl } from '../lib/images';
 import { cloudGetBlob, cloudListImages, cloudReady } from '../lib/cloud';
 import type { DriveImage } from '../lib/drive';
+import { pickDriveImage, pickerAvailable } from '../lib/picker';
 
 /** Drive-Dateien über 25 MB werden nicht geladen (zu groß zum Verkleinern im Browser). */
 const MAX_DRIVE_BYTES = 25_000_000;
@@ -94,7 +95,25 @@ export function ImageInput({ value, onChange }: { value: string; onChange: (v: s
             if (f) take(async () => f);
           }}
         />
-        {cloudReady() && <button type="button" class="btn" disabled={busy} onClick={() => setDrive((d) => !d)}>{t('image.fromDrive')}</button>}
+        {cloudReady() && (
+          <button
+            type="button"
+            class="btn"
+            disabled={busy}
+            onClick={async () => {
+              if (!pickerAvailable) return setDrive((d) => !d); // ohne API-Schlüssel: eigene Liste
+              setErr('');
+              try {
+                const f = await pickDriveImage(); // Standard-Dateiwähler von Google mit Vorschau
+                if (f) take(() => cloudGetBlob(f.id));
+              } catch (e: any) {
+                setErr(String(e?.message ?? e));
+              }
+            }}
+          >
+            {t('image.fromDrive')}
+          </button>
+        )}
       </div>
       {busy && <p class="hint" role="status">{t('image.processing')}</p>}
       {err && <p class="warn" role="alert">{err}</p>}

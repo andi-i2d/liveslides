@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 // Lokal: installiertes Edge (kein Download). In CI: von Playwright installiertes Chromium.
 // Echte Zugangsdaten aus .env.local werden überschrieben (leere Werte), damit Tests deterministisch laufen.
-const blank = { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '', VITE_GOOGLE_CLIENT_ID: '', VITE_ALLOWED_DOMAIN: '', VITE_DRIVE_FOLDER_ID: '' };
+const blank = { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '', VITE_GOOGLE_CLIENT_ID: '', VITE_ALLOWED_DOMAIN: '', VITE_DRIVE_FOLDER_ID: '', VITE_GOOGLE_API_KEY: '' };
 
 export default defineConfig({
   testDir: 'e2e',
@@ -25,6 +25,14 @@ export default defineConfig({
       // zweite Instanz mit aktivierter Google-Anmeldung (Google selbst wird im Test simuliert)
       command: 'npm run dev -- --port 5198 --strictPort',
       url: 'http://localhost:5198',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      env: { ...blank, VITE_GOOGLE_CLIENT_ID: 'test-client.apps.googleusercontent.com', VITE_ALLOWED_DOMAIN: 'i2d.test', VITE_GOOGLE_API_KEY: 'test-key' },
+    },
+    {
+      // wie oben, aber ohne API-Schlüssel (Ausweichliste statt Google-Dateiwähler)
+      command: 'npm run dev -- --port 5197 --strictPort',
+      url: 'http://localhost:5197',
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       env: { ...blank, VITE_GOOGLE_CLIENT_ID: 'test-client.apps.googleusercontent.com', VITE_ALLOWED_DOMAIN: 'i2d.test' },

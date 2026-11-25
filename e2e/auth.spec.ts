@@ -1,54 +1,8 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { fakeDriveFile, fakeGoogle, fakePicker, signIn } from './fakes';
 
-// Diese Tests laufen gegen die Instanz mit Google-Anmeldung (Port 5198, Domain-Vorgabe i2d.test).
+// Diese Tests laufen gegen die Instanz mit Google-Anmeldung und API-Schlüssel (Port 5198, Domain-Vorgabe i2d.test).
 test.use({ baseURL: 'http://localhost:5198', locale: 'de-DE' });
-
-/** Simuliert Google: Anmeldeskript, Profil und die Drive-API. */
-async function fakeGoogle(ctx: BrowserContext, who: string) {
-  const uploads: { method: string; url: string; body: string }[] = [];
-  const folders: string[] = [];
-  let n = 0;
-
-  await ctx.addInitScript((email) => {
-    (window as any).__who = email;
-  }, who);
-  await ctx.route('https://accounts.google.com/gsi/client', (r) =>
-    r.fulfill({
-      contentType: 'text/javascript',
-      body: `window.google = { accounts: { oauth2: {
-        initTokenClient: (cfg) => ({ requestAccessToken: () => setTimeout(() => cfg.callback({ access_token: 'tok-' + window.__who, expires_in: 3600 }), 10) }),
-        revoke: (t, cb) => cb && cb(),
-      } } };`,
-    }),
-  );
-  await ctx.route('https://www.googleapis.com/oauth2/v3/userinfo', (r) => {
-    const email = (r.request().headers()['authorization'] ?? '').replace('Bearer tok-', '');
-    return r.fulfill({
-      json: { email, email_verified: true, name: email.split('@')[0], ...(email.endsWith('@i2d.test') ? { hd: 'i2d.test' } : {}) },
-    });
-  });
-  await ctx.route('https://www.googleapis.com/**/drive/v3/**', async (r) => {
-    const req = r.request();
-    const url = req.url();
-    if (url.includes('/upload/')) {
-      uploads.push({ method: req.method(), url, body: req.postData() ?? '' });
-      return r.fulfill({ json: { id: `file${++n}` } });
-    }
-    if (req.method() === 'POST') {
-      folders.push(JSON.parse(req.postData() ?? '{}').name);
-      return r.fulfill({ json: { id: `folder${++n}` } });
-    }
-    return r.fulfill({ json: { files: [] } }); // Ordnersuche: noch nichts vorhanden
-  });
-  return { uploads, folders };
-}
-
-async function signIn(page: Page, email = 'anna@i2d.test') {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Mit Google anmelden' }).click();
-  // Auf den abgeschlossenen Login warten: erst dann ist das Konto für die stille Wiederanmeldung nach einem Neuladen gemerkt.
-  await expect(page.getByText(email)).toBeVisible();
-}
 
 test('ohne Anmeldung ist nur die Login-Seite erreichbar, Teilnehmer-Link nicht', async ({ context, page }) => {
   await fakeGoogle(context, 'anna@i2d.test');
@@ -101,17 +55,10 @@ test('Anmeldung mit i2d-Konto, Deck und Ergebnisse landen in Drive', async ({ co
   expect(res!.url).toContain('uploadType=multipart');
 });
 
-test('Bild aus Drive wählen: Suche, Auswahl, Download und Einbetten', async ({ context, page }) => {
+test('Bild aus Drive: Standard-Dateiwähler von Google mit Schlüssel, Token und Laufwerken', async ({ context, page }) => {
   await fakeGoogle(context, 'anna@i2d.test');
-  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-  const queries: string[] = [];
-  // spezifischere Routen gewinnen gegen die allgemeine Drive-Simulation (später registriert = zuerst geprüft)
-  await context.route((u) => u.href.includes('image%2F'), (r) => {
-    queries.push(decodeURIComponent(r.request().url()));
-    return r.fulfill({ json: { files: [{ id: 'img1', name: 'Teamfoto.png', mimeType: 'image/png', modifiedTime: '2026-01-02T10:00:00Z', size: '70' }] } });
-  });
-  await context.route((u) => u.href.includes('/files/img1') && u.href.includes('alt=media'), (r) =>
-    r.fulfill({ contentType: 'image/png', body: PNG, headers: { 'access-control-allow-origin': '*' } }));
+  await fakePicker(context, 'pick');
+  await fakeDriveFile(context);
   await signIn(page);
   await page.evaluate(() =>
     localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'dr', title: 'Bilder', slides: [
@@ -120,16 +67,32 @@ test('Bild aus Drive wählen: Suche, Auswahl, Download und Einbetten', async ({ 
   await page.goto('/#/edit/dr');
   await page.reload();
   await page.getByRole('button', { name: 'Aus Drive …' }).click();
-  await expect(page.getByText('Teamfoto.png')).toBeVisible();
-  expect(queries[0]).toContain("mimeType contains 'image/'");
-  await page.getByPlaceholder('In Drive nach Bildern suchen').fill('team');
-  await page.getByRole('button', { name: 'Suchen' }).click();
-  await expect.poll(() => queries.some((q) => q.includes("name contains 'team'"))).toBe(true);
-  await page.getByRole('button', { name: 'Wählen' }).click();
-  await expect(page.locator('.imgchip')).toContainText('Bild eingebettet');
-  await expect(page.locator('.drivepick')).toHaveCount(0); // Auswahl schließt sich
+  await expect(page.locator('.imgchip')).toContainText('Bild eingebettet'); // gewählt, heruntergeladen, verkleinert
+  await expect(page.locator('.drivepick')).toHaveCount(0); // keine eigene Liste, wenn der Dateiwähler verfügbar ist
+  const o = await page.evaluate(() => (window as any).__pickerOpts);
+  expect(o.key).toBe('test-key');
+  expect(o.token).toBe('tok-anna@i2d.test');
+  expect(o.appId).toBe('test'); // Projektnummer = Teil der Client-ID vor dem ersten Bindestrich
+  expect(o.locale).toBe('de');
+  expect(o.features).toContain('support-drives'); // geteilte Laufwerke
+  expect(o.views.length).toBe(2); // Meine Ablage/Laufwerke + Mit mir geteilt
 });
 
+test('Abbrechen im Dateiwähler ändert nichts und zeigt keinen Fehler', async ({ context, page }) => {
+  await fakeGoogle(context, 'anna@i2d.test');
+  await fakePicker(context, 'cancel');
+  await signIn(page);
+  await page.evaluate(() =>
+    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'dr', title: 'Bilder', slides: [
+      { id: 's1', type: 'pinimage', data: { question: 'Wo?', image: 'https://example.org/a.jpg' } } ] }])),
+  );
+  await page.goto('/#/edit/dr');
+  await page.reload();
+  await page.getByRole('button', { name: 'Aus Drive …' }).click();
+  await expect.poll(() => page.evaluate(() => !!(window as any).__pickerOpts)).toBe(true);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByLabel('Bild-URL')).toHaveValue('https://example.org/a.jpg');
+});
 test('Editor sichert Änderungen als Deck-Datei in Drive', async ({ context, page }) => {
   const drive = await fakeGoogle(context, 'anna@i2d.test');
   await signIn(page);

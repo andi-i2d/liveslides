@@ -9,6 +9,10 @@ export const CLIENT_ID: string = env.VITE_GOOGLE_CLIENT_ID ?? '';
 export const ALLOWED_DOMAIN: string = String(env.VITE_ALLOWED_DOMAIN ?? '').trim().toLowerCase().replace(/^@/, '');
 export const DRIVE_FOLDER_ID: string = env.VITE_DRIVE_FOLDER_ID ?? '';
 export const authEnabled = !!CLIENT_ID;
+/** Browser-API-Schlüssel für den Google-Dateiwähler (Picker). Öffentlich, aber in der Cloud Console auf die Website beschränken. */
+export const API_KEY: string = env.VITE_GOOGLE_API_KEY ?? '';
+/** Projektnummer = Teil der Client-ID vor dem ersten Bindestrich; der Picker braucht sie als App-ID. */
+export const PROJECT_NUMBER = CLIENT_ID.split('-')[0];
 
 /** Mit festem Zielordner (z. B. Ordner im geteilten i2d-Laufwerk) braucht die App vollen Drive-Zugriff, sonst nur eigene Dateien. */
 export const SCOPES = [
