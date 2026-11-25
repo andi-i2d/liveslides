@@ -5,6 +5,7 @@ import { createSlide, typeList, types } from '../slides';
 import { t as tr, useLang } from '../lib/i18n';
 import { cloudReady, cloudSaveDeck, useCloudStatus } from '../lib/cloud';
 import { Logo } from './Brand';
+import { ImageInput } from './ImageInput';
 
 function FieldInput({ f, value, onChange }: { f: Field; value: any; onChange: (v: any) => void }) {
   if (f.kind === 'textarea')
@@ -33,8 +34,9 @@ function FieldInput({ f, value, onChange }: { f: Field; value: any; onChange: (v
 export function Editor({ id }: { id: string }) {
   const [deck, setDeck] = useState<Deck | undefined>(getDeck(id));
   const [sel, setSel] = useState(0);
+  const [storageFull, setStorageFull] = useState(false);
   useEffect(() => {
-    if (deck) saveDeck(deck);
+    if (deck) setStorageFull(!saveDeck(deck)); // false = Browser-Speicher voll (z. B. viele eingebettete Bilder)
   }, [deck]);
   useLang();
   const cloud = useCloudStatus();
@@ -99,6 +101,7 @@ export function Editor({ id }: { id: string }) {
       </main>
 
       <aside class="props">
+        {storageFull && <p class="warn" role="alert">{tr('editor.storageFull')}</p>}
         <label>
           {tr('editor.deckTitle')}
           <input value={deck.title} onInput={(e) => update((d) => (d.title = (e.target as HTMLInputElement).value))} />
@@ -106,16 +109,23 @@ export function Editor({ id }: { id: string }) {
         {slide && t && (
           <>
             <h4>{t.icon} {t.label}</h4>
-            {t.fields.map((f) => (
-              <label>
-                {f.label}
-                <FieldInput
-                  f={f}
-                  value={slide.data[f.key]}
-                  onChange={(v) => update((d) => (d.slides[sel].data[f.key] = v))}
-                />
-              </label>
-            ))}
+            {t.fields.map((f) =>
+              f.kind === 'image' ? (
+                <div class="imgfield" key={`${slide.id}-${f.key}`}>
+                  <span class="lbl">{f.label}</span>
+                  <ImageInput value={slide.data[f.key] ?? ''} onChange={(v) => update((d) => (d.slides[sel].data[f.key] = v))} />
+                </div>
+              ) : (
+                <label>
+                  {f.label}
+                  <FieldInput
+                    f={f}
+                    value={slide.data[f.key]}
+                    onChange={(v) => update((d) => (d.slides[sel].data[f.key] = v))}
+                  />
+                </label>
+              ),
+            )}
             <div class="row">
               <button class="btn" disabled={sel === 0} onClick={() => { update((d) => d.slides.splice(sel - 1, 0, d.slides.splice(sel, 1)[0])); setSel(sel - 1); }}>↑</button>
               <button class="btn" disabled={sel >= deck.slides.length - 1} onClick={() => { update((d) => d.slides.splice(sel + 1, 0, d.slides.splice(sel, 1)[0])); setSel(sel + 1); }}>↓</button>

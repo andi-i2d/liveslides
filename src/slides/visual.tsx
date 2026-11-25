@@ -20,7 +20,7 @@ export const image: SlideType = {
   interactive: false,
   defaults: () => ({ url: '', caption: '' }),
   fields: [
-    { key: 'url', label: 'Bild-URL', kind: 'url' },
+    { key: 'url', label: 'Bild', kind: 'image' },
     { key: 'caption', label: 'Bildunterschrift', kind: 'text' },
   ],
   Stage: ({ data }) => (

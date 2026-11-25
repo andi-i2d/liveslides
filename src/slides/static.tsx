@@ -31,7 +31,7 @@ export const contentSlide: SlideType = {
   fields: [
     { key: 'title', label: 'Titel', kind: 'text' },
     { key: 'body', label: 'Text', kind: 'textarea' },
-    { key: 'image', label: 'Bild-URL (optional)', kind: 'url' },
+    { key: 'image', label: 'Bild (optional)', kind: 'image' },
     {
       key: 'layout',
       label: 'Bildposition',

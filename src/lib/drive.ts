@@ -203,3 +203,19 @@ export async function getJson<T = unknown>(env: DriveEnv, id: string): Promise<T
   const r = await call(env, `${API}/files/${enc(id)}?alt=media&${SHARED}`);
   return r.json();
 }
+
+export interface DriveImage { id: string; name: string; mimeType: string; modifiedTime: string; size?: string }
+
+/** Bilddateien aus Drive (eigene und geteilte Laufwerke), neueste zuerst, optional nach Namen gefiltert. */
+export async function listImages(env: DriveEnv, search = ''): Promise<DriveImage[]> {
+  const s = search.trim();
+  const query = ["mimeType contains 'image/'", 'trashed=false', s ? `name contains '${q(s)}'` : null].filter(Boolean).join(' and ');
+  const r = await call(env, `${API}/files?q=${enc(query)}&fields=files(id,name,mimeType,modifiedTime,size)&pageSize=40&orderBy=modifiedTime desc&corpora=allDrives&${ALL}`);
+  return (await r.json()).files ?? [];
+}
+
+/** Dateiinhalt (z. B. ein Bild) herunterladen. */
+export async function getBlob(env: DriveEnv, id: string): Promise<Blob> {
+  const r = await call(env, `${API}/files/${enc(id)}?alt=media&${SHARED}`);
+  return r.blob();
+}

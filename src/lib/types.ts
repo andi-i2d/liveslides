@@ -22,7 +22,7 @@ export interface Resp {
 export interface Field {
   key: string;
   label: string;
-  kind: 'text' | 'textarea' | 'list' | 'number' | 'select' | 'url';
+  kind: 'text' | 'textarea' | 'list' | 'number' | 'select' | 'url' | 'image';
   options?: { value: string | number; label: string }[];
   /** Für kind:'select' bei Antwortlisten: Index der richtigen Antwort wählen. */
   listKey?: string;
@@ -54,6 +54,8 @@ export interface SlideType {
   live?: boolean;
   /** true: Folie hat Etappen; Präsentator bekommt einen „Schritt“-Knopf */
   steps?: boolean;
+  /** true: der Player (Handy) zeigt die Bilder der Folie (kind:'image'); eingebettete Bilder werden dann separat gesendet */
+  phoneImages?: boolean;
   defaults(): any;
   fields: Field[];
   Stage(p: { data: any; ctx: StageCtx }): ComponentChildren;
@@ -77,5 +79,7 @@ export type Msg =
   | { t: 'state'; deck?: Deck; index: number; step?: number; code: string }
   | { t: 'resp'; slideId: string; resp: Resp }
   | { t: 'live'; slideId: string; responses: Resp[] }
+  /** Eingebettete Bilder einer Folie (Feld → Data-URL), getrennt vom Deck, damit jede Nachricht klein bleibt */
+  | { t: 'asset'; slideId: string; fields: Record<string, string> }
   /** Präsentator hat einen Anzeigenamen eindeutig gemacht (z. B. „Lustiger Luchs 2“) */
   | { t: 'rename'; pid: string; name: string };

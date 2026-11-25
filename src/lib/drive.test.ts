@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearFolderCache, DriveError, listDecks, saveDeck, saveResults, upsertJson, type DriveEnv, type IdMap } from './drive';
+import { clearFolderCache, DriveError, getBlob, listDecks, listImages, saveDeck, saveResults, upsertJson, type DriveEnv, type IdMap } from './drive';
 import { domainAllowed } from './google';
 import { buildResults, resultsFileName } from './results';
 
@@ -24,6 +24,10 @@ function fakeDrive(opts: { preseed?: string[] } = {}) {
     const mime = /mimeType='([^']+)'/.exec(query)?.[1];
     const parent = /'((?:[^'\\]|\\.)*)' in parents/.exec(query)?.[1];
     const prop = /appProperties has \{ key='([^']+)' and value='((?:[^'\\]|\\.)*)' \}/.exec(query);
+    const mimeHas = /mimeType contains '([^']+)'/.exec(query)?.[1];
+    const nameHas = /name contains '((?:[^'\\\\]|\\\\.)*)'/.exec(query)?.[1];
+    if (mimeHas && !f.mimeType.includes(mimeHas)) return false;
+    if (nameHas !== undefined && !f.name.toLowerCase().includes(nameHas.replace(/\\\\'/g, "'").toLowerCase())) return false;
     if (name !== undefined && f.name !== name.replace(/\\'/g, "'")) return false;
     if (mime && f.mimeType !== mime) return false;
     if (parent && !f.parents.includes(parent)) return false;
@@ -219,6 +223,37 @@ describe('Drive: Präsentationen auflisten', () => {
     await upsertJson(d.env, { name: 'Fremd.json', folderId: 'ANDERER', json: {}, kind: 'deck' }); // Deck-Datei außerhalb des Wurzelordners
     const list = await listDecks(d.env);
     expect(list.map((f) => [f.folder, f.name])).toEqual([['Zweite', 'Zweite.json'], ['Erste', 'Erste.json']]);
+  });
+});
+
+describe('Drive: Bilder wählen', () => {
+  const addImg = (d: ReturnType<typeof fakeDrive>, id: string, name: string, mimeType: string, modifiedTime: string) =>
+    d.files.set(id, { id, name, mimeType, parents: ['X'], modifiedTime, json: { bytes: id } });
+
+  it('listet nur Bilddateien, neueste zuerst, und filtert nach Namen (Groß-/Kleinschreibung egal)', async () => {
+    const d = fakeDrive();
+    addImg(d, 'i1', 'Logo alt.png', 'image/png', '2026-01-01T00:00:01.000Z');
+    addImg(d, 'i2', 'Foto Team.jpg', 'image/jpeg', '2026-01-01T00:00:03.000Z');
+    addImg(d, 'i3', 'Logo neu.svg', 'image/svg+xml', '2026-01-01T00:00:02.000Z');
+    addImg(d, 'd1', 'Notizen.json', 'application/json', '2026-01-01T00:00:04.000Z');
+    expect((await listImages(d.env)).map((f) => f.id)).toEqual(['i2', 'i3', 'i1']);
+    expect((await listImages(d.env, 'LOGO')).map((f) => f.id)).toEqual(['i3', 'i1']);
+    expect(await listImages(d.env, 'gibtsnicht')).toEqual([]);
+  });
+  it('sucht in allen Laufwerken und maskiert Hochkommas im Suchbegriff', async () => {
+    const d = fakeDrive();
+    addImg(d, 'i1', "Omas Foto's.png", 'image/png', '2026-01-01T00:00:01.000Z');
+    expect((await listImages(d.env, "Foto's")).map((f) => f.id)).toEqual(['i1']);
+    const url = d.calls.at(-1)!.url;
+    expect(url).toContain('corpora=allDrives');
+    expect(url).toContain('supportsAllDrives=true');
+  });
+  it('lädt den Dateiinhalt mit Token herunter', async () => {
+    const d = fakeDrive();
+    addImg(d, 'i1', 'a.png', 'image/png', '2026-01-01T00:00:01.000Z');
+    const blob = await getBlob(d.env, 'i1');
+    expect(JSON.parse(await blob.text())).toEqual({ bytes: 'i1' });
+    expect(d.calls.at(-1)!.url).toContain('alt=media');
   });
 });
 

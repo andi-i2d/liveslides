@@ -7,6 +7,7 @@ import { t, useLang } from '../lib/i18n';
 import { funnyName, resolveName } from '../lib/names';
 import { retryDelay } from '../lib/pacing';
 import { Logo } from './Brand';
+import { withAssets } from '../lib/assets';
 
 const store = {
   get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -28,6 +29,7 @@ export function Join({ code }: { code: string }) {
   const [step, setStep] = useState(0);
   const [mine, setMine] = useState<Record<string, Resp[]>>({});
   const [live, setLive] = useState<Record<string, Resp[]>>({});
+  const [assets, setAssets] = useState<Record<string, Record<string, string>>>({});
   const ch = useRef<Channel | undefined>(undefined);
   const deckRef = useRef<Deck | undefined>(undefined);
   deckRef.current = deck;
@@ -41,6 +43,8 @@ export function Join({ code }: { code: string }) {
         setStep(m.step ?? 0);
       } else if (m.t === 'live') {
         setLive((l) => ({ ...l, [m.slideId]: m.responses }));
+      } else if (m.t === 'asset') {
+        setAssets((a) => ({ ...a, [m.slideId]: { ...a[m.slideId], ...m.fields } })); // eingebettete Bilder der Folie
       } else if (m.t === 'rename' && m.pid === pid.current) {
         setName(m.name); // Präsentator hat den Namen eindeutig gemacht
       }
@@ -118,7 +122,7 @@ export function Join({ code }: { code: string }) {
     <div class="page narrow" role="main">
       <p class="youare" aria-label={`${t('join.youAre')} ${name}`}>👤 {name}</p>
       {type.Player ? (
-        <type.Player data={slide.data} submit={submit} mine={mine[slide.id] ?? []} live={live[slide.id] ?? []} pid={pid.current} step={step} />
+        <type.Player data={withAssets(slide, assets[slide.id])} submit={submit} mine={mine[slide.id] ?? []} live={live[slide.id] ?? []} pid={pid.current} step={step} />
       ) : (
         <p class="hint" role="status">{t('join.look')}</p>
       )}

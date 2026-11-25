@@ -1,6 +1,7 @@
 import { useRef, useState } from 'preact/hooks';
 import type { Resp, SlideType } from '../lib/types';
 import { scoreMap, scorePin, scoreShort } from './grading';
+import { PENDING } from '../lib/images';
 
 const COLORS = ['#fc6933', '#1e8e8e', '#2f6fb0', '#e8556d', '#4a9d5b', '#146c7a', '#c2541d', '#4f5d75'];
 const WORLD = 'https://upload.wikimedia.org/wikipedia/commons/8/83/Equirectangular_projection_SW.jpg';
@@ -19,7 +20,7 @@ function PinImage({ src, dots, onPick, small }: { src: string; dots: Dot[]; onPi
         onPick([(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]);
       }}
     >
-      {src ? <img src={src} alt="" draggable={false} /> : <div class="ph">Bild-URL eintragen</div>}
+      {src === PENDING ? <div class="ph">Bild wird geladen …</div> : src ? <img src={src} alt="" draggable={false} /> : <div class="ph">Bild wählen oder URL eintragen</div>}
       {dots.map((d) => (
         <span
           class={'pin' + (d.ring ? ' ring' : '')}
@@ -51,11 +52,11 @@ function PinPlayer({ data, submit, mine, title }: { data: any; submit: (d: any) 
 }
 
 export const pinImage: SlideType = {
-  id: 'pinimage', label: 'Pin auf Bild', icon: '📍', category: 'Bild', interactive: true,
+  id: 'pinimage', label: 'Pin auf Bild', icon: '📍', category: 'Bild', interactive: true, phoneImages: true,
   defaults: () => ({ question: 'Wo würdet ihr sitzen?', image: '' }),
   fields: [
     { key: 'question', label: 'Frage', kind: 'text' },
-    { key: 'image', label: 'Bild-URL', kind: 'url' },
+    { key: 'image', label: 'Bild', kind: 'image' },
   ],
   Stage: ({ data, ctx }) => (
     <div class="col">
@@ -67,11 +68,11 @@ export const pinImage: SlideType = {
 };
 
 export const pinQuiz: SlideType = {
-  id: 'pinquiz', label: 'Quiz: Pin auf Bild', icon: '🎯', category: 'Quiz', interactive: true,
+  id: 'pinquiz', label: 'Quiz: Pin auf Bild', icon: '🎯', category: 'Quiz', interactive: true, phoneImages: true,
   defaults: () => ({ question: 'Wo ist das Ziel?', image: '', x: 50, y: 50, radius: 25, points: 1000 }),
   fields: [
     { key: 'question', label: 'Frage', kind: 'text' },
-    { key: 'image', label: 'Bild-URL', kind: 'url' },
+    { key: 'image', label: 'Bild', kind: 'image' },
     { key: 'x', label: 'Ziel X (0–100 %)', kind: 'number' },
     { key: 'y', label: 'Ziel Y (0–100 %)', kind: 'number' },
     { key: 'radius', label: 'Toleranz (% der Bildbreite)', kind: 'number' },
@@ -88,11 +89,11 @@ export const pinQuiz: SlideType = {
 };
 
 export const mapQuiz: SlideType = {
-  id: 'mapquiz', label: 'Quiz: Pin auf Karte', icon: '🗺️', category: 'Quiz', interactive: true,
+  id: 'mapquiz', label: 'Quiz: Pin auf Karte', icon: '🗺️', category: 'Quiz', interactive: true, phoneImages: true,
   defaults: () => ({ question: 'Wo liegt Paris?', image: WORLD, lat: 48.85, lon: 2.35, maxKm: 3000, points: 1000 }),
   fields: [
     { key: 'question', label: 'Gesuchter Ort', kind: 'text' },
-    { key: 'image', label: 'Weltkarte (Equirectangular, ganze Welt)', kind: 'url' },
+    { key: 'image', label: 'Weltkarte (Equirectangular, ganze Welt)', kind: 'image' },
     { key: 'lat', label: 'Breite (Lat)', kind: 'number' },
     { key: 'lon', label: 'Länge (Lon)', kind: 'number' },
     { key: 'maxKm', label: 'Ab dieser Entfernung 0 Punkte (km)', kind: 'number' },
@@ -118,11 +119,11 @@ export function parseHotspots(lines: string[]) {
 }
 
 export const hotspots: SlideType = {
-  id: 'hotspots', label: 'Interaktives Bild', icon: '👆', category: 'Bild', interactive: true, multi: true,
+  id: 'hotspots', label: 'Interaktives Bild', icon: '👆', category: 'Bild', interactive: true, phoneImages: true, multi: true,
   defaults: () => ({ title: 'Entdeckt das Bild', image: '', pins: ['25; 40; Erste Info', '70; 60; Zweite Info'] }),
   fields: [
     { key: 'title', label: 'Titel', kind: 'text' },
-    { key: 'image', label: 'Bild-URL', kind: 'url' },
+    { key: 'image', label: 'Bild', kind: 'image' },
     { key: 'pins', label: 'Pins (x %; y %; Text, max. 8)', kind: 'list' },
   ],
   Stage: ({ data, ctx }) => {
@@ -143,7 +144,7 @@ export const hotspots: SlideType = {
       <>
         <h3>{data.title}</h3>
         <div class="pinimg small">
-          {data.image && <img src={data.image} alt="" />}
+          {data.image && data.image !== PENDING && <img src={data.image} alt="" />}
           {h.map((p, i) => (
             <button class="pin tap" style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%`, background: COLORS[i % 8] }} onClick={() => { setOpen(i); submit(i); }}>{i + 1}</button>
           ))}
@@ -161,17 +162,17 @@ function strokePath(s: Stroke) {
 }
 
 export const annotate: SlideType = {
-  id: 'annotate', label: 'Auf Bild zeichnen', icon: '🖍️', category: 'Bild', interactive: true,
+  id: 'annotate', label: 'Auf Bild zeichnen', icon: '🖍️', category: 'Bild', interactive: true, phoneImages: true,
   defaults: () => ({ question: 'Markiert, was euch auffällt', image: '' }),
   fields: [
     { key: 'question', label: 'Aufgabe', kind: 'text' },
-    { key: 'image', label: 'Bild-URL', kind: 'url' },
+    { key: 'image', label: 'Bild', kind: 'image' },
   ],
   Stage: ({ data, ctx }) => (
     <div class="col">
       <h2>{data.question}</h2>
       <div class="pinimg">
-        {data.image && <img src={data.image} alt="" />}
+        {data.image && data.image !== PENDING && <img src={data.image} alt="" />}
         <svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="over">
           {ctx.responses.flatMap((r, i) => ((r.data as Stroke[]) ?? []).map((s) => <path d={strokePath(s)} stroke={COLORS[i % 8]} fill="none" stroke-width="5" stroke-linecap="round" />))}
         </svg>
@@ -190,7 +191,7 @@ export const annotate: SlideType = {
       <>
         <h3>{data.question}</h3>
         <div class="pinimg small">
-          {data.image && <img src={data.image} alt="" />}
+          {data.image && data.image !== PENDING && <img src={data.image} alt="" />}
           <svg
             viewBox="0 0 1000 1000" preserveAspectRatio="none" class="over draw"
             onPointerDown={(e) => { if (done) return; (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); cur.current = { c: '#fc6933', p: [rel(e)] }; setStrokes((s) => [...s, cur.current!]); }}
@@ -329,7 +330,7 @@ export const guessImage: SlideType = {
   defaults: () => ({ question: 'Was ist das?', image: '', answers: ['Eiffelturm'], points: 1000 }),
   fields: [
     { key: 'question', label: 'Frage', kind: 'text' },
-    { key: 'image', label: 'Bild-URL', kind: 'url' },
+    { key: 'image', label: 'Bild', kind: 'image' },
     { key: 'answers', label: 'Akzeptierte Antworten', kind: 'list' },
     { key: 'points', label: 'Punkte', kind: 'number' },
   ],

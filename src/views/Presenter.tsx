@@ -7,6 +7,7 @@ import { Qr } from '../slides/static';
 import { createGuard } from '../lib/guard';
 import { createNameRegistry } from '../lib/names';
 import { createCoalescer, liveDelay } from '../lib/pacing';
+import { phoneAssets, stripImages } from '../lib/assets';
 import { t, useLang } from '../lib/i18n';
 import { cloudReady, cloudSaveResults, useCloudStatus } from '../lib/cloud';
 import { hasAnyResponse } from '../lib/results';
@@ -43,10 +44,16 @@ export function Presenter({ id }: { id: string }) {
     if (!deck) return;
     // Das komplette Deck geht nur als Antwort auf „hello“ raus. Viele gleichzeitige Hallos (Beitritts-Ansturm)
     // werden zu einer einzigen Antwort gebündelt; bei kleinen Gruppen kommt sie fast sofort.
-    const sendFull = () =>
-      ch.current?.send({ t: 'state', deck, index: stateRef.current.index, step: stateRef.current.step, code });
-    const helloFast = createCoalescer(sendFull, 100);
-    const helloSlow = createCoalescer(sendFull, 1000);
+    // Eingebettete Bilder gehen nicht im Deck mit (Nachrichten bleiben klein), sondern als „asset“ der aktuellen Folie.
+    const lite = stripImages(deck);
+    const reply = () => {
+      const i = stateRef.current.index;
+      ch.current?.send({ t: 'state', deck: lite, index: i, step: stateRef.current.step, code });
+      const assets = phoneAssets(deck.slides[i]);
+      if (assets) ch.current?.send({ t: 'asset', slideId: deck.slides[i].id, fields: assets });
+    };
+    const helloFast = createCoalescer(reply, 100);
+    const helloSlow = createCoalescer(reply, 1000);
     ch.current = openChannel(code, (m: Msg) => {
       if (m.t === 'hello') {
         seen.current.add(m.pid);
@@ -78,8 +85,15 @@ export function Presenter({ id }: { id: string }) {
   }, [deck, code]);
 
   useEffect(() => {
-    if (deck) ch.current?.send({ t: 'state', index, step, code }); // ohne Deck: spart Daten bei vielen Teilnehmenden
+    if (!deck) return;
+    ch.current?.send({ t: 'state', index, step, code }); // ohne Deck: spart Daten bei vielen Teilnehmenden
   }, [index, step]);
+
+  // Neue Folie mit eingebetteten Bildern, die das Handy zeigt: Bilder einmal an alle senden (nicht bei jedem Schritt)
+  useEffect(() => {
+    const assets = deck && phoneAssets(deck.slides[index]);
+    if (deck && assets) ch.current?.send({ t: 'asset', slideId: deck.slides[index].id, fields: assets });
+  }, [index]);
 
   // Live-Antworten der aktuellen Folie an die Handys (gedrosselt), z. B. für Abstimmungen über Ideen
   useEffect(() => {

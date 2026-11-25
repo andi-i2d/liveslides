@@ -68,3 +68,5 @@ export function cloudSaveResults(deck: Deck, all: Record<string, Resp[]>, meta: 
 
 export const cloudListDecks = () => drive.listDecks(env());
 export const cloudLoadDeck = (id: string) => drive.getJson<Deck>(env(), id);
+export const cloudListImages = (search?: string) => drive.listImages(env(), search);
+export const cloudGetBlob = (id: string) => drive.getBlob(env(), id);

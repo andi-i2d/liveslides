@@ -11,18 +11,24 @@ export function loadDecks(): Deck[] {
     return [];
   }
 }
-export function saveDecks(d: Deck[]) {
-  localStorage.setItem(KEY, JSON.stringify(d));
+/** Liefert false, wenn der Browser-Speicher voll ist (z. B. durch viele eingebettete Bilder). */
+export function saveDecks(d: Deck[]): boolean {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(d));
+    return true;
+  } catch {
+    return false;
+  }
 }
 export function getDeck(id: string) {
   return loadDecks().find((d) => d.id === id);
 }
-export function saveDeck(deck: Deck) {
+export function saveDeck(deck: Deck): boolean {
   const all = loadDecks();
   const i = all.findIndex((d) => d.id === deck.id);
   if (i >= 0) all[i] = deck;
   else all.push(deck);
-  saveDecks(all);
+  return saveDecks(all);
 }
 export function deleteDeck(id: string) {
   saveDecks(loadDecks().filter((d) => d.id !== id));

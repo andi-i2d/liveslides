@@ -1,6 +1,7 @@
 import type { Deck, Resp } from './types';
 import { types } from '../slides';
 import { leaderboardOf } from '../slides/quiz';
+import { redactImages } from './assets';
 
 export interface ResultsMeta { code: string; startedAt: number; participants: number; savedAt?: number }
 
@@ -18,7 +19,7 @@ export function buildResults(deck: Deck, all: Record<string, Resp[]>, meta: Resu
       nr: i + 1,
       id: s.id,
       type: s.type,
-      data: s.data,
+      data: redactImages(s.data),
       responses: (all[s.id] ?? []).map((r) => ({ name: r.name, pid: r.pid, at: new Date(r.at).toISOString(), answer: r.data })),
     })),
   };
