@@ -3,7 +3,8 @@ import type { Deck, Msg, Resp } from '../lib/types';
 import { openChannel, type Channel } from '../lib/realtime';
 import { types } from '../slides';
 import { uid } from '../lib/store';
-import { t, useLang } from '../lib/i18n';
+import { getLang, t, useLang } from '../lib/i18n';
+import { nameMode, resolveName } from '../lib/names';
 
 const store = {
   get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -12,8 +13,9 @@ const store = {
 
 export function Join({ code }: { code: string }) {
   useLang();
-  const [name, setName] = useState(store.get('liveslides.name') ?? '');
-  const [joined, setJoined] = useState(false);
+  const [input, setInput] = useState(store.get('liveslides.name') ?? '');
+  /** endgültiger Anzeigename; null = Namensabfrage läuft noch */
+  const [name, setName] = useState<string | null>(null);
   const [deck, setDeck] = useState<Deck>();
   const [index, setIndex] = useState(0);
   const [step, setStep] = useState(0);
@@ -25,8 +27,9 @@ export function Join({ code }: { code: string }) {
   const deckRef = useRef<Deck | undefined>(undefined);
   deckRef.current = deck;
 
+  // Verbindung sofort aufbauen: so kennen wir die Einstellung „Name Pflicht/optional“ der Präsentation,
+  // noch bevor der Name abgefragt wird.
   useEffect(() => {
-    if (!joined) return;
     ch.current = openChannel(code, (m: Msg) => {
       if (m.t === 'state') {
         setDeck(m.deck);
@@ -43,23 +46,39 @@ export function Join({ code }: { code: string }) {
       clearInterval(iv);
       ch.current?.close();
     };
-  }, [joined, code]);
+  }, [code]);
 
-  if (!joined)
+  const mode = nameMode(deck); // bis die Präsentation bekannt ist, gilt die strengere Variante (Pflicht)
+  const guestLabel = getLang() === 'de' ? 'Gast' : 'Guest';
+
+  if (name === null)
     return (
       <div class="page narrow">
         <h2>{t('join.title')} {code}</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!name.trim()) return;
-            store.set('liveslides.name', name.trim());
-            setJoined(true);
+            const n = resolveName(input, mode, pid.current, guestLabel);
+            if (!n) return;
+            if (input.trim()) store.set('liveslides.name', n);
+            setName(n);
           }}
         >
-          <input aria-label={t('join.name')} placeholder={t('join.name')} value={name} maxLength={30} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+          <input
+            aria-label={t('join.name')}
+            placeholder={mode === 'optional' ? t('join.nameOptional') : t('join.name')}
+            value={input}
+            maxLength={30}
+            onInput={(e) => setInput((e.target as HTMLInputElement).value)}
+          />
           <button class="btn primary">{t('join.go')}</button>
+          {mode === 'optional' && !input.trim() && (
+            <button type="button" class="btn" onClick={() => setName(resolveName('', 'optional', pid.current, guestLabel))}>
+              {t('join.skip')}
+            </button>
+          )}
         </form>
+        {!deck && <p class="hint" role="status">{t('join.connecting')}</p>}
       </div>
     );
 
@@ -68,7 +87,7 @@ export function Join({ code }: { code: string }) {
   const type = slide && types[slide.type];
   if (!type) return <div class="page narrow"><p role="status">{t('join.wait')}</p></div>;
   const submit = (data: any) => {
-    const resp: Resp = { pid: pid.current, name: name.trim(), data, at: Date.now() };
+    const resp: Resp = { pid: pid.current, name, data, at: Date.now() };
     ch.current?.send({ t: 'resp', slideId: slide.id, resp });
     setMine((m) => ({ ...m, [slide.id]: [...(m[slide.id] ?? []), resp] }));
   };

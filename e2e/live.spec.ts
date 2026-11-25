@@ -3,13 +3,13 @@
 const mk = (type: string, data: unknown) => ({ id: Math.random().toString(36).slice(2, 9), type, data });
 
 /** Legt ein Deck an, öffnet die Präsentator-Ansicht und liefert Seite + Beitrittscode. */
-async function startPresenter(ctx: BrowserContext, slides: ReturnType<typeof mk>[]) {
+async function startPresenter(ctx: BrowserContext, slides: ReturnType<typeof mk>[], settings?: { names: 'required' | 'optional' }) {
   const pres = await ctx.newPage();
   await pres.goto('/');
-  await pres.evaluate((s) => {
+  await pres.evaluate(([s, st]) => {
     localStorage.setItem('liveslides.lang', 'de');
-    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'e2e', title: 'E2E', slides: s }]));
-  }, slides);
+    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'e2e', title: 'E2E', slides: s, settings: st }]));
+  }, [slides, settings] as const);
   await pres.goto('/#/present/e2e');
   const code = (await pres.locator('.bar .code').innerText()).trim();
   return { pres, code };
@@ -76,6 +76,70 @@ test('Eingabeflut wird begrenzt (Rate-Limit)', async ({ browser }) => {
   expect(n).toBeGreaterThan(0);
   expect(n).toBeLessThan(40); // mehr als 8/s werden verworfen
   await ctx.close();
+});
+
+const quizSlides = () => [
+  mk('shortanswer', { question: 'Hauptstadt?', answers: ['Paris'], points: 1000 }),
+  mk('leaderboard', { title: 'Rangliste' }),
+];
+
+test('Name Pflicht: ohne Namen geht es nicht weiter, kein „Ohne Namen“-Knopf', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { pres, code } = await startPresenter(ctx, quizSlides()); // Standard = Pflicht
+  const phone = await ctx.newPage();
+  await phone.goto(`/#/join/${code}`);
+  await expect(phone.getByText('Verbinde')).toHaveCount(0, { timeout: 10_000 }); // Präsentation ist bekannt
+  await expect(phone.getByRole('button', { name: 'Ohne Namen mitmachen' })).toHaveCount(0);
+  await phone.getByRole('button', { name: 'Los!' }).click(); // leer → bleibt auf der Namensseite
+  await expect(phone.getByPlaceholder('Dein Name')).toBeVisible();
+  await phone.getByPlaceholder('Dein Name').fill('Lea');
+  await phone.getByRole('button', { name: 'Los!' }).click();
+  await expect(phone.getByText('Hauptstadt?')).toBeVisible();
+  await ctx.close();
+});
+
+test('Name optional: ohne Namen mitmachen ergibt „Gast …“ in der Rangliste', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { pres, code } = await startPresenter(ctx, quizSlides(), { names: 'optional' });
+  const phone = await ctx.newPage();
+  await phone.goto(`/#/join/${code}`);
+  await phone.getByRole('button', { name: 'Ohne Namen mitmachen' }).click(); // erscheint, sobald die Einstellung bekannt ist
+  await phone.getByRole('textbox').fill('paris');
+  await phone.getByRole('button', { name: 'Absenden' }).click();
+  await expect(pres.getByText('1 Antwort(en)')).toBeVisible();
+  await pres.getByRole('button', { name: 'Nächste Folie' }).click();
+  await expect(pres.locator('.lb li')).toContainText([/^Gast [A-Z0-9]{1,3}1000$/]);
+  await ctx.close();
+});
+
+test('Name optional: ein eingegebener Name wird trotzdem verwendet', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { pres, code } = await startPresenter(ctx, quizSlides(), { names: 'optional' });
+  const phone = await ctx.newPage();
+  await phone.goto(`/#/join/${code}`);
+  await expect(phone.getByPlaceholder('Dein Name (optional)')).toBeVisible();
+  await phone.getByPlaceholder('Dein Name (optional)').fill('Mia');
+  await expect(phone.getByRole('button', { name: 'Ohne Namen mitmachen' })).toHaveCount(0); // Name eingetippt → kein Überspringen nötig
+  await phone.getByRole('button', { name: 'Los!' }).click();
+  await phone.getByRole('textbox').fill('paris');
+  await phone.getByRole('button', { name: 'Absenden' }).click();
+  await pres.getByRole('button', { name: 'Nächste Folie' }).click();
+  await expect(pres.locator('.lb li')).toContainText(['Mia1000']);
+  await ctx.close();
+});
+
+test('Einstellung im Editor wird am Deck gespeichert', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.setItem('liveslides.lang', 'de');
+    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'ed', title: 'T', slides: [{ id: 's1', type: 'title', data: { title: 'A', subtitle: 'B' } }] }]));
+  });
+  await page.goto('/#/edit/ed');
+  await page.reload();
+  await page.getByLabel('Namen der Teilnehmer').selectOption('optional');
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('liveslides.decks')!)[0].settings))
+    .toEqual({ names: 'optional' });
 });
 
 test('QR-Code lässt sich jederzeit ein- und ausblenden (Taste Q und Knopf)', async ({ browser }) => {

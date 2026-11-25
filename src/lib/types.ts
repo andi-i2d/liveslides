@@ -9,6 +9,8 @@ export interface Deck {
   id: string;
   title: string;
   slides: Slide[];
+  /** Einstellungen der Präsentation (werden mit dem Deck an die Teilnehmer gesendet) */
+  settings?: { names?: 'required' | 'optional' };
 }
 
 /** Eine Antwort eines Teilnehmers auf eine Folie. */
