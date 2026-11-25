@@ -9,8 +9,6 @@ export interface Deck {
   id: string;
   title: string;
   slides: Slide[];
-  /** Einstellungen der Präsentation (werden mit dem Deck an die Teilnehmer gesendet) */
-  settings?: { names?: 'required' | 'optional' };
 }
 
 /** Eine Antwort eines Teilnehmers auf eine Folie. */
@@ -75,7 +73,8 @@ export interface SlideType {
 // ---- Netzwerkprotokoll ----
 export type Msg =
   | { t: 'hello'; pid: string }
-  | { t: 'state'; deck: Deck; index: number; step?: number; code: string }
+  /** `deck` nur in der Antwort auf „hello“; Folienwechsel senden nur index/step (spart Datenmenge bei vielen Teilnehmenden) */
+  | { t: 'state'; deck?: Deck; index: number; step?: number; code: string }
   | { t: 'resp'; slideId: string; resp: Resp }
   | { t: 'live'; slideId: string; responses: Resp[] }
   /** Präsentator hat einen Anzeigenamen eindeutig gemacht (z. B. „Lustiger Luchs 2“) */

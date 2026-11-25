@@ -4,7 +4,6 @@ import { getDeck, saveDeck } from '../lib/store';
 import { createSlide, typeList, types } from '../slides';
 import { t as tr, useLang } from '../lib/i18n';
 import { cloudReady, cloudSaveDeck, useCloudStatus } from '../lib/cloud';
-import { nameMode, type NameMode } from '../lib/names';
 
 function FieldInput({ f, value, onChange }: { f: Field; value: any; onChange: (v: any) => void }) {
   if (f.kind === 'textarea')
@@ -102,16 +101,6 @@ export function Editor({ id }: { id: string }) {
         <label>
           {tr('editor.deckTitle')}
           <input value={deck.title} onInput={(e) => update((d) => (d.title = (e.target as HTMLInputElement).value))} />
-        </label>
-        <label>
-          {tr('editor.names')}
-          <select
-            value={nameMode(deck)}
-            onChange={(e) => update((d) => (d.settings = { ...d.settings, names: (e.target as HTMLSelectElement).value as NameMode }))}
-          >
-            <option value="required">{tr('editor.names.required')}</option>
-            <option value="optional">{tr('editor.names.optional')}</option>
-          </select>
         </label>
         {slide && t && (
           <>

@@ -1,15 +1,15 @@
-﻿import { expect, test, type BrowserContext } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 
 const mk = (type: string, data: unknown) => ({ id: Math.random().toString(36).slice(2, 9), type, data });
 
 /** Legt ein Deck an, öffnet die Präsentator-Ansicht und liefert Seite + Beitrittscode. */
-async function startPresenter(ctx: BrowserContext, slides: ReturnType<typeof mk>[], settings?: { names: 'required' | 'optional' }) {
+async function startPresenter(ctx: BrowserContext, slides: ReturnType<typeof mk>[]) {
   const pres = await ctx.newPage();
   await pres.goto('/');
-  await pres.evaluate(([s, st]) => {
+  await pres.evaluate((s) => {
     localStorage.setItem('liveslides.lang', 'de');
-    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'e2e', title: 'E2E', slides: s, settings: st }]));
-  }, [slides, settings] as const);
+    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'e2e', title: 'E2E', slides: s }]));
+  }, slides);
   await pres.goto('/#/present/e2e');
   const code = (await pres.locator('.bar .code').innerText()).trim();
   return { pres, code };
@@ -82,97 +82,121 @@ const quizSlides = () => [
   mk('shortanswer', { question: 'Hauptstadt?', answers: ['Paris'], points: 1000 }),
   mk('leaderboard', { title: 'Rangliste' }),
 ];
+// „Lustiger Luchs“: zwei Wörter mit demselben Anfangsbuchstaben (ohne Nummer), danach die Punkte
+const FUNNY = /^(\p{L})\S* \1\S*1000$/u;
+const FUNNY_NAME = /^(\p{L})\S* \1\S*$/u;
 
-test('Name Pflicht: ohne Namen geht es nicht weiter, kein „Ohne Namen“-Knopf', async ({ browser }) => {
-  const ctx = await browser.newContext({ locale: 'de-DE' });
-  const { pres, code } = await startPresenter(ctx, quizSlides()); // Standard = Pflicht
-  const phone = await ctx.newPage();
-  await phone.goto(`/#/join/${code}`);
-  await expect(phone.getByText('Verbinde')).toHaveCount(0, { timeout: 10_000 }); // Präsentation ist bekannt
-  await expect(phone.getByRole('button', { name: 'Ohne Namen mitmachen' })).toHaveCount(0);
-  await phone.getByRole('button', { name: 'Los!' }).click(); // leer → bleibt auf der Namensseite
-  await expect(phone.getByPlaceholder('Dein Name')).toBeVisible();
-  await phone.getByPlaceholder('Dein Name').fill('Lea');
-  await phone.getByRole('button', { name: 'Los!' }).click();
-  await expect(phone.getByText('Hauptstadt?')).toBeVisible();
-  await ctx.close();
-});
-
-// „Lustiger Luchs“: zwei Wörter mit demselben Anfangsbuchstaben (optional mit Nummer), danach die Punkte
-const FUNNY = /^(\p{L})\S* \1\S*( \d+)?1000$/u;
-
-test('Name optional: ohne Namen mitmachen ergibt einen lustigen Zufallsnamen (Doppelname, gleicher Anfangsbuchstabe)', async ({ browser }) => {
-  const ctx = await browser.newContext({ locale: 'de-DE' });
-  const { pres, code } = await startPresenter(ctx, quizSlides(), { names: 'optional' });
-  const phone = await ctx.newPage();
-  await phone.goto(`/#/join/${code}`);
-  await phone.getByRole('button', { name: 'Ohne Namen mitmachen' }).click(); // erscheint, sobald die Einstellung bekannt ist
-  const youAre = (await phone.locator('.youare').innerText()).replace('👤', '').trim();
-  expect(youAre).toMatch(/^(\p{L})\S* \1\S*$/u); // z. B. „Lustiger Luchs“
+/** Öffnet den Beitritt und liefert das Handy (noch vor der Namensbestätigung). */
+async function openJoin(ctx: BrowserContext, code: string, pid?: string) {
+  const p = await ctx.newPage();
+  if (pid) await p.addInitScript((id) => localStorage.setItem('liveslides.pid', id), pid);
+  await p.goto(`/#/join/${code}`);
+  return p;
+}
+async function answerParis(phone: Awaited<ReturnType<typeof openJoin>>) {
   await phone.getByRole('textbox').fill('paris');
   await phone.getByRole('button', { name: 'Absenden' }).click();
+}
+
+test('Namensvorschlag steht im Feld: unverändert übernehmen ergibt einen lustigen Doppelnamen überall', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { pres, code } = await startPresenter(ctx, quizSlides());
+  const phone = await openJoin(ctx, code);
+  const field = phone.getByPlaceholder('Dein Name');
+  const suggestion = await field.inputValue();
+  expect(suggestion).toMatch(FUNNY_NAME); // z. B. „Dreister Denker“: gleicher Anfangsbuchstabe
+  await phone.getByRole('button', { name: 'Los!' }).click(); // nichts getippt: der Vorschlag gilt
+  await expect(phone.locator('.youare')).toContainText(suggestion);
+  await answerParis(phone);
   await expect(pres.getByText('1 Antwort(en)')).toBeVisible();
   await pres.getByRole('button', { name: 'Nächste Folie' }).click();
   await expect(pres.locator('.lb li')).toHaveText([FUNNY]);
-  expect((await pres.locator('.lb li span').innerText()).trim()).toBe(youAre); // Beamer zeigt denselben Namen wie das Handy
+  expect((await pres.locator('.lb li span').innerText()).trim()).toBe(suggestion); // Beamer = Handy
   await ctx.close();
 });
 
-test('Zwei Personen mit demselben Namen werden unterscheidbar („Anna“ und „Anna 2“)', async ({ browser }) => {
+test('Eigener Name statt Vorschlag', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { pres, code } = await startPresenter(ctx, quizSlides());
+  const phone = await openJoin(ctx, code);
+  await phone.getByPlaceholder('Dein Name').fill('Mia');
+  await phone.getByRole('button', { name: 'Los!' }).click();
+  await answerParis(phone);
+  await pres.getByRole('button', { name: 'Nächste Folie' }).click();
+  await expect(pres.locator('.lb li')).toContainText(['Mia1000']);
+  await ctx.close();
+});
+
+test('Feld leeren und bestätigen: es gilt wieder der Vorschlag (der Name ist nie leer)', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { code } = await startPresenter(ctx, quizSlides());
+  const phone = await openJoin(ctx, code);
+  const suggestion = await phone.getByPlaceholder('Dein Name').inputValue();
+  await phone.getByPlaceholder('Dein Name').fill('   ');
+  await phone.getByRole('button', { name: 'Los!' }).click();
+  await expect(phone.locator('.youare')).toContainText(suggestion);
+  await ctx.close();
+});
+
+test('🎲 „Anderer Vorschlag“ liefert einen neuen lustigen Namen', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { code } = await startPresenter(ctx, quizSlides());
+  const phone = await openJoin(ctx, code);
+  const field = phone.getByPlaceholder('Dein Name');
+  const seen = new Set([await field.inputValue()]);
+  for (let i = 0; i < 4; i++) {
+    await phone.getByRole('button', { name: 'Anderer Vorschlag' }).click();
+    const v = await field.inputValue();
+    expect(v).toMatch(FUNNY_NAME);
+    seen.add(v);
+  }
+  expect(seen.size).toBeGreaterThanOrEqual(4);
+  await ctx.close();
+});
+
+test('Zwei Geräte mit demselben Listennamen: das zweite bekommt automatisch einen anderen, ohne Nummer', async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const { pres, code } = await startPresenter(ctx, quizSlides());
+  const a = await openJoin(ctx, code, 'pid-aaa');
+  await a.getByPlaceholder('Dein Name').fill('Lustiger Luchs');
+  await a.getByRole('button', { name: 'Los!' }).click();
+  await answerParis(a);
+  await expect(pres.getByText('1 Antwort(en)')).toBeVisible();
+  const b = await openJoin(ctx, code, 'pid-bbb');
+  await b.getByPlaceholder('Dein Name').fill('Lustiger Luchs');
+  await b.getByRole('button', { name: 'Los!' }).click();
+  await answerParis(b);
+  await expect(pres.getByText('2 Antwort(en)')).toBeVisible();
+  await expect(b.locator('.youare')).not.toContainText('Lustiger Luchs'); // Handy erfährt den neuen Namen
+  const nameB = (await b.locator('.youare').innerText()).replace('👤', '').trim();
+  expect(nameB).toMatch(FUNNY_NAME);
+  expect(nameB).not.toMatch(/\d/);
+  await pres.getByRole('button', { name: 'Nächste Folie' }).click();
+  expect((await pres.locator('.lb li span').allInnerTexts()).map((s) => s.trim()).sort()).toEqual(['Lustiger Luchs', nameB].sort());
+  await ctx.close();
+});
+
+test('Zwei Personen mit demselben getippten Namen werden unterscheidbar („Anna“ und „Anna 2“)', async ({ browser }) => {
   const ctx = await browser.newContext({ locale: 'de-DE' });
   const { pres, code } = await startPresenter(ctx, quizSlides());
   const join = async (pid: string) => {
-    const p = await ctx.newPage();
-    await p.addInitScript((id) => localStorage.setItem('liveslides.pid', id), pid); // eigene Geräte-ID je Handy
-    await p.goto(`/#/join/${code}`);
+    const p = await openJoin(ctx, code, pid);
     await p.getByPlaceholder('Dein Name').fill('Anna');
     await p.getByRole('button', { name: 'Los!' }).click();
-    await p.getByRole('textbox').fill('paris');
-    await p.getByRole('button', { name: 'Absenden' }).click();
+    await answerParis(p);
     return p;
   };
   const a = await join('pid-aaa');
   await expect(pres.getByText('1 Antwort(en)')).toBeVisible();
   const b = await join('pid-bbb');
   await expect(pres.getByText('2 Antwort(en)')).toBeVisible();
-  await expect(b.locator('.youare')).toContainText('Anna 2'); // Handy erfährt den eindeutigen Namen
+  await expect(b.locator('.youare')).toContainText('Anna 2');
   await expect(a.locator('.youare')).not.toContainText('Anna 2');
   await pres.getByRole('button', { name: 'Nächste Folie' }).click();
   await expect(pres.locator('.lb li')).toHaveCount(2);
   expect((await pres.locator('.lb li span').allInnerTexts()).map((s) => s.trim()).sort()).toEqual(['Anna', 'Anna 2']);
   await ctx.close();
 });
-
-test('Name optional: ein eingegebener Name wird trotzdem verwendet', async ({ browser }) => {
-  const ctx = await browser.newContext({ locale: 'de-DE' });
-  const { pres, code } = await startPresenter(ctx, quizSlides(), { names: 'optional' });
-  const phone = await ctx.newPage();
-  await phone.goto(`/#/join/${code}`);
-  await expect(phone.getByPlaceholder('Dein Name (optional)')).toBeVisible();
-  await phone.getByPlaceholder('Dein Name (optional)').fill('Mia');
-  await expect(phone.getByRole('button', { name: 'Ohne Namen mitmachen' })).toHaveCount(0); // Name eingetippt → kein Überspringen nötig
-  await phone.getByRole('button', { name: 'Los!' }).click();
-  await phone.getByRole('textbox').fill('paris');
-  await phone.getByRole('button', { name: 'Absenden' }).click();
-  await pres.getByRole('button', { name: 'Nächste Folie' }).click();
-  await expect(pres.locator('.lb li')).toContainText(['Mia1000']);
-  await ctx.close();
-});
-
-test('Einstellung im Editor wird am Deck gespeichert', async ({ page }) => {
-  await page.goto('/');
-  await page.evaluate(() => {
-    localStorage.setItem('liveslides.lang', 'de');
-    localStorage.setItem('liveslides.decks', JSON.stringify([{ id: 'ed', title: 'T', slides: [{ id: 's1', type: 'title', data: { title: 'A', subtitle: 'B' } }] }]));
-  });
-  await page.goto('/#/edit/ed');
-  await page.reload();
-  await page.getByLabel('Namen der Teilnehmer').selectOption('optional');
-  await expect
-    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('liveslides.decks')!)[0].settings))
-    .toEqual({ names: 'optional' });
-});
-
 test('QR-Code lässt sich jederzeit ein- und ausblenden (Taste Q und Knopf)', async ({ browser }) => {
   const ctx = await browser.newContext({ locale: 'de-DE' });
   const { pres, code } = await startPresenter(ctx, [mk('poll', { question: 'Egal?', options: ['A', 'B'] })]);

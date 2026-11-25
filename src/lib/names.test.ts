@@ -1,27 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { createNameRegistry, funnyName, funnyNameCount, nameMode, resolveName } from './names';
+import { createNameRegistry, funnyName, funnyNameCount, isPoolName, resolveName } from './names';
 import { WORDS } from './namewords';
 
-describe('Namensmodus', () => {
-  it('Standard ist Pflicht; nur „optional“ schaltet um', () => {
-    expect(nameMode(undefined)).toBe('required');
-    expect(nameMode({})).toBe('required');
-    expect(nameMode({ settings: { names: 'optional' } })).toBe('optional');
-    expect(nameMode({ settings: { names: 'quatsch' } })).toBe('required');
+describe('Namenseingabe', () => {
+  it('ein eingegebener Name wird bereinigt und auf 30 Zeichen gekürzt', () => {
+    expect(resolveName('  Mia   Muster ', 'abc123')).toBe('Mia Muster');
+    expect(resolveName('x'.repeat(50), 'p')).toHaveLength(30);
   });
-  it('Pflicht: leerer Name ist nicht erlaubt, sonst bereinigt und gekürzt', () => {
-    expect(resolveName('   ', 'required', 'abc123')).toBeNull();
-    expect(resolveName('  Mia   Muster ', 'required', 'abc123')).toBe('Mia Muster');
-    expect(resolveName('x'.repeat(50), 'required', 'p')).toHaveLength(30);
+  it('leere Eingabe ergibt den Vorschlag – der Name ist nie leer', () => {
+    expect(resolveName('', 'k4m9p')).toBe(funnyName('k4m9p'));
+    expect(resolveName('   ', 'k4m9p')).toBe(funnyName('k4m9p'));
+    expect(resolveName('Lea', 'k4m9p')).toBe('Lea');
   });
-  it('optional: leer ergibt einen Zufallsnamen, ein eingegebener Name bleibt', () => {
-    const a = resolveName('', 'optional', 'k4m9p')!;
-    expect(a).toBe(funnyName('k4m9p'));
-    expect(resolveName(' ', 'optional', 'k4m9p')).toBe(a);
-    expect(resolveName('Lea', 'optional', 'k4m9p')).toBe('Lea');
+  it('„Anderer Vorschlag“ (variant) liefert abweichende, aber stabile Namen', () => {
+    const base = funnyName('geraet-1');
+    const others = [1, 2, 3, 4, 5].map((v) => funnyName('geraet-1', v));
+    expect(others.every((n) => isPoolName(n))).toBe(true);
+    expect(new Set([base, ...others]).size).toBeGreaterThanOrEqual(5);
+    expect(funnyName('geraet-1', 3)).toBe(others[2]);
+    expect(funnyName('geraet-1', 0)).toBe(base);
   });
 });
-
 describe('Lustige Zufallsnamen', () => {
   const all = Object.entries(WORDS).flatMap(([l, w]) => w.adj.flatMap((a) => w.noun.map((n) => ({ l, a, n, name: `${a} ${n}` }))));
 
@@ -68,15 +67,50 @@ describe('Lustige Zufallsnamen', () => {
   });
 });
 
+describe('Bis 699 Teilnehmende: Zufallsnamen ohne Wiederholung und ohne Nummern', () => {
+  it('699 Geräte bekommen 699 verschiedene Namen aus der Liste, keine mit Nummer', () => {
+    const r = createNameRegistry();
+    const finals = Array.from({ length: funnyNameCount() }, (_, i) => {
+      const pid = `geraet-${i}`;
+      return r.assign(pid, funnyName(pid)); // das Handy schickt seinen Wunschnamen (Hash der Geräte-ID)
+    });
+    expect(new Set(finals.map((n) => n.toLowerCase())).size).toBe(funnyNameCount());
+    for (const n of finals) {
+      expect(isPoolName(n), n).toBe(true);
+      expect(/\d/.test(n), n).toBe(false);
+    }
+  });
+  it('wiederholte Anfragen derselben Person ändern den Namen nicht', () => {
+    const r = createNameRegistry();
+    const first = Array.from({ length: 50 }, (_, i) => r.assign(`p${i}`, funnyName(`p${i}`)));
+    const again = Array.from({ length: 50 }, (_, i) => r.assign(`p${i}`, funnyName(`p${i}`)));
+    expect(again).toEqual(first);
+    const renamed = Array.from({ length: 50 }, (_, i) => r.assign(`p${i}`, first[i])); // Handy schickt zugewiesenen Namen
+    expect(renamed).toEqual(first);
+  });
+  it('die 700. Person bekommt (erst dann) eine Nummer; selbst getippte Namen werden nummeriert', () => {
+    const r = createNameRegistry();
+    for (let i = 0; i < funnyNameCount(); i++) r.assign(`g${i}`, funnyName(`g${i}`));
+    const extra = r.assign('extra', 'Lustiger Luchs');
+    expect(extra).toMatch(/^Lustiger Luchs \d+$/);
+    const r2 = createNameRegistry();
+    expect(r2.assign('a', 'Anna')).toBe('Anna');
+    expect(r2.assign('b', 'Anna')).toBe('Anna 2');
+  });
+});
+
 describe('Eindeutige Anzeigenamen', () => {
-  it('der zweite gleiche Name bekommt eine Nummer, dieselbe Person behält ihren Namen', () => {
+  it('gleiche Zufallsnamen werden durch einen anderen freien Listennamen ersetzt, getippte Namen nummeriert', () => {
     const r = createNameRegistry();
     expect(r.assign('p1', 'Lustiger Luchs')).toBe('Lustiger Luchs');
-    expect(r.assign('p2', 'Lustiger Luchs')).toBe('Lustiger Luchs 2');
-    expect(r.assign('p3', 'lustiger luchs')).toBe('lustiger luchs 3'); // Groß-/Kleinschreibung egal
-    expect(r.assign('p2', 'Lustiger Luchs')).toBe('Lustiger Luchs 2'); // stabil
-    expect(r.assign('p2', 'Lustiger Luchs 2')).toBe('Lustiger Luchs 2'); // Handy sendet den zugewiesenen Namen zurück
+    const second = r.assign('p2', 'Lustiger Luchs');
+    expect(second).not.toBe('Lustiger Luchs');
+    expect(isPoolName(second)).toBe(true); // wieder ein lustiger Name, keine Nummer
+    expect(r.assign('p2', 'Lustiger Luchs')).toBe(second); // stabil
+    expect(r.assign('p2', second)).toBe(second); // Handy sendet den zugewiesenen Namen zurück
     expect(r.assign('p1', 'Lustiger Luchs')).toBe('Lustiger Luchs');
+    expect(r.assign('p3', 'Anna')).toBe('Anna');
+    expect(r.assign('p4', 'anna')).toBe('anna 2'); // Groß-/Kleinschreibung egal, getippt → Nummer
   });
   it('wer den Namen ändert, bekommt neu vergeben (und gibt den alten frei)', () => {
     const r = createNameRegistry();

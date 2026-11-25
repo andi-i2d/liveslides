@@ -24,7 +24,7 @@ Ohne Supabase läuft ein Testmodus (BroadcastChannel): Präsentator-Tab und Teil
 ## Bedienung
 - Präsentieren: Pfeiltasten/Leertaste blättern, **R** löst Quizfragen auf, **N** schaltet Etappen weiter
   (Turnier, Team-Retro), **F** Vollbild. Teilnehmer treten über QR-Code oder Code bei.
-- **Namen der Teilnehmer** (Editor → rechts, pro Präsentation): *Name ist Pflicht* (Standard) oder *Name ist optional*. Optional heißt: Teilnehmer können einen Namen eingeben oder ohne Namen mitmachen und bekommen dann einen lustigen Zufallsnamen aus dem Ideen-/Denk-/Innovationsbereich, z. B. „Dreister Denker“ oder „Lustiger Luchs“ (Adjektiv und Nomen mit gleichem Anfangsbuchstaben, 699 Kombinationen, pro Gerät stabil). Gleiche Namen werden automatisch unterscheidbar gemacht („Anna“, „Anna 2“); das Handy zeigt oben „👤 Name“. Die Wortliste steht in `src/lib/namewords.ts` und lässt sich dort erweitern; ein Test prüft Buchstaben, Länge und eine Liste unerwünschter Wörter.
+- **Namen der Teilnehmer:** Beim Beitritt steht im Namensfeld ein lustiger Vorschlag aus dem Ideen-/Denk-/Innovationsbereich, z. B. „Dreister Denker“ oder „Lustiger Luchs“ (Adjektiv und Nomen mit gleichem Anfangsbuchstaben, 699 Namen, pro Gerät stabil). Wer will, tippt einen eigenen Namen oder würfelt mit 🎲 einen anderen Vorschlag; ein leeres Feld ergibt wieder den Vorschlag, der Name ist also nie leer. Bis 699 Personen vergibt der Präsentator jeden Listennamen höchstens einmal (ohne Nummern); selbst getippte gleiche Namen werden zu „Anna“, „Anna 2“. Das Handy zeigt oben „👤 Name“. Die Wortliste steht in `src/lib/namewords.ts`; ein Test prüft Buchstaben, Länge und eine Liste unerwünschter Wörter.
 - Decks liegen im Browser (localStorage). Über JSON exportieren/importieren, um sie zu sichern oder zu teilen.
 - Sprache der Oberfläche: Deutsch/Englisch (Auswahl auf der Startseite). Folieninhalte sind frei wählbar.
 - Offline: Nach dem ersten Laden funktionieren Editor und Präsentation ohne Netz (Service Worker);
@@ -72,6 +72,21 @@ Bewertungslogik gehört als reine Funktion nach `src/slides/grading.ts` bzw. `ga
 ## Deploy
 Repo `liveslides` auf GitHub, Settings → Pages → Source: **GitHub Actions**. Push auf `main` führt Tests und E2E aus und deployt.
 
+## Größe und Grenzen (geplant: bis 699 Teilnehmende)
+Grundsatz: Der Präsentator soll möglichst wenig tun und möglichst wenig auf Teilnehmer-Nachrichten reagieren müssen.
+Deshalb: Namen werden automatisch vergeben, Ergebnisse automatisch in Drive gesichert, und der Funkverkehr ist sparsam:
+- Beitritts-Ansturm: Viele gleichzeitige „Hallo“ werden zu **einer** Antwort mit dem Deck gebündelt (bei bis zu 20 Personen fast sofort, darüber im Sekundentakt). Handys wiederholen ihre Anfrage mit wachsenden Abständen (2 s bis ca. 15 s, mit Streuung).
+- Folienwechsel senden nur Folien-Nummer und Schritt, nicht das ganze Deck erneut.
+- Die „live“-Spiegelung (Ideenabstimmung, Q&A) wird mit der Teilnehmerzahl seltener getaktet (0,3 s bis 3 s).
+- Pro Person höchstens 8 Nachrichten/s und 200 Antworten je Folie; überlange Nachrichten werden verworfen.
+
+**Supabase-Plan:** Laut [Supabase-Doku](https://supabase.com/docs/guides/realtime/limits) erlaubt der Free-Plan 200 gleichzeitige Verbindungen und 100 Nachrichten/s,
+Pro 500 Verbindungen und 500 Nachrichten/s, Pro ohne Spend-Cap bzw. Team 10.000 Verbindungen und 2.500 Nachrichten/s.
+Für 699 Teilnehmende plus Präsentator (700 Verbindungen) braucht ihr also mindestens Pro **ohne Spend-Cap** (zusätzliche Spitzenverbindungen kosten extra).
+Auch das Monatskontingent (Pro: 5 Mio. Nachrichten) ist im Blick zu behalten; ob jede Zustellung an einen Empfänger zählt, bitte vor dem Einsatz in der Doku/im Dashboard prüfen.
+
+**Nicht getestet:** Die Software ist mit simulierten Lasten (Namensvergabe für 699 Geräte, Bündelung von 699 Hallos) und mit einzelnen echten Browsern geprüft, **nicht** mit 699 echten Geräten.
+Vor dem Großeinsatz bitte einen Probelauf mit vielen Handys machen. Der Präsentator-Browser ist der zentrale Empfänger: ein stabiler Rechner mit guter Verbindung, andere Tabs schließen.
 ## Bekannte Grenzen
 - Keine Konten oder Server-Speicherung: Ergebnisse gehen verloren, wenn der Präsentator-Tab geschlossen wird.
 - Der Teilnehmer-Name und die Geräte-ID liegen im Browser; zwei Tabs im selben Browser zählen als eine Person.

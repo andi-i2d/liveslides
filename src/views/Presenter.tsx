@@ -6,6 +6,7 @@ import { types } from '../slides';
 import { Qr } from '../slides/static';
 import { createGuard } from '../lib/guard';
 import { createNameRegistry } from '../lib/names';
+import { createCoalescer, liveDelay } from '../lib/pacing';
 import { t, useLang } from '../lib/i18n';
 import { cloudReady, cloudSaveResults, useCloudStatus } from '../lib/cloud';
 import { hasAnyResponse } from '../lib/results';
@@ -31,19 +32,26 @@ export function Presenter({ id }: { id: string }) {
   const seen = useRef(new Set<string>());
   const guard = useRef(createGuard());
   const names = useRef(createNameRegistry());
+  const liveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allRef = useRef(all);
+  allRef.current = all;
   const stateRef = useRef({ index, step });
   stateRef.current.index = index;
   stateRef.current.step = step;
 
   useEffect(() => {
     if (!deck) return;
-    const send = () =>
+    // Das komplette Deck geht nur als Antwort auf „hello“ raus. Viele gleichzeitige Hallos (Beitritts-Ansturm)
+    // werden zu einer einzigen Antwort gebündelt; bei kleinen Gruppen kommt sie fast sofort.
+    const sendFull = () =>
       ch.current?.send({ t: 'state', deck, index: stateRef.current.index, step: stateRef.current.step, code });
+    const helloFast = createCoalescer(sendFull, 100);
+    const helloSlow = createCoalescer(sendFull, 1000);
     ch.current = openChannel(code, (m: Msg) => {
       if (m.t === 'hello') {
         seen.current.add(m.pid);
         setPlayers(seen.current.size);
-        send();
+        (seen.current.size < 20 ? helloFast : helloSlow).trigger();
       } else if (m.t === 'resp') {
         const slide = deck.slides.find((s) => s.id === m.slideId);
         const accepted = slide && guard.current.accept(m.slideId, m.resp);
@@ -62,11 +70,15 @@ export function Presenter({ id }: { id: string }) {
         });
       }
     });
-    return () => ch.current?.close();
+    return () => {
+      helloFast.cancel();
+      helloSlow.cancel();
+      ch.current?.close();
+    };
   }, [deck, code]);
 
   useEffect(() => {
-    if (deck) ch.current?.send({ t: 'state', deck, index, step, code });
+    if (deck) ch.current?.send({ t: 'state', index, step, code }); // ohne Deck: spart Daten bei vielen Teilnehmenden
   }, [index, step]);
 
   // Live-Antworten der aktuellen Folie an die Handys (gedrosselt), z. B. für Abstimmungen über Ideen
@@ -74,12 +86,16 @@ export function Presenter({ id }: { id: string }) {
     if (!deck) return;
     const s = deck.slides[index];
     if (!types[s.type].live) return;
-    const timer = setTimeout(
-      () => ch.current?.send({ t: 'live', slideId: s.id, responses: (all[s.id] ?? []).slice(-300) }),
-      300,
-    );
-    return () => clearTimeout(timer);
+    // Drosselung: höchstens eine Spiegelung je Zeitfenster; es wird immer der neueste Stand gesendet.
+    if (liveTimer.current) return;
+    liveTimer.current = setTimeout(() => {
+      liveTimer.current = null;
+      const cur = deck.slides[stateRef.current.index];
+      if (cur && types[cur.type].live)
+        ch.current?.send({ t: 'live', slideId: cur.id, responses: (allRef.current[cur.id] ?? []).slice(-300) });
+    }, liveDelay(seen.current.size));
   }, [all, index]);
+  useEffect(() => () => { if (liveTimer.current) clearTimeout(liveTimer.current); }, []);
 
   // Ergebnisse in Google Drive sichern: kurz nach der letzten Antwort und beim Folienwechsel.
   const saveNow = () => {
